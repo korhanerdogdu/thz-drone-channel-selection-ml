@@ -1,0 +1,71 @@
+# ---------------------------------------------------------------------------
+# Virtual environments
+# ---------------------------------------------------------------------------
+.venv/
+venv/
+env/
+ENV/
+
+
+# ---------------------------------------------------------------------------
+# Python caches / build artefacts
+# ---------------------------------------------------------------------------
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+build/
+dist/
+.pytest_cache/
+.mypy_cache/
+.ipynb_checkpoints/
+
+# ---------------------------------------------------------------------------
+# PDFs: ignore by default, but DO track our own compiled correspondence.
+#   * Joint_Resource_Allocation_..._June2024.pdf and d3qn.pdf are third-party
+#     published papers (redistribution is not ours to grant) -- they are cited
+#     in the README instead.
+#   * paper/thz_ml_maxactive.pdf is OUR paper and is tracked (negated below).
+#   * thz_ml_maxactive_correspondence.pdf in the repo root is a duplicate copy
+#     of that same file, so it stays ignored -- paper/ holds the canonical one.
+# ---------------------------------------------------------------------------
+*.pdf
+!paper/thz_ml_maxactive.pdf
+
+# ---------------------------------------------------------------------------
+# LaTeX build products (the .tex source is tracked)
+# ---------------------------------------------------------------------------
+*.aux
+*.log
+*.out
+*.bbl
+*.blg
+*.brf
+*.fls
+*.fdb_latexmk
+*.synctex.gz
+*.toc
+*.lof
+*.lot
+*.spl
+
+# ---------------------------------------------------------------------------
+# Scratch / personal notes and internal working documents
+# ---------------------------------------------------------------------------
+z.txt
+
+# Internal engineering/design log -- not part of the public deliverable
+CLAUDE.md
+claude.md
+.claude/
+
+# ---------------------------------------------------------------------------
+# OS and editor cruft
+# ---------------------------------------------------------------------------
+.DS_Store
+Thumbs.db
+desktop.ini
+.vscode/
+.idea/
+*~
+*.swp
