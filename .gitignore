@@ -26,8 +26,8 @@ dist/
 #     published papers (redistribution is not ours to grant) -- they are cited
 #     in the README instead.
 #   * paper/thz_ml_maxactive.pdf is OUR paper and is tracked (negated below).
-#   * thz_ml_maxactive_correspondence.pdf in the repo root is a duplicate copy
-#     of that same file, so it stays ignored -- paper/ holds the canonical one.
+#     (There is deliberately no second copy in the repo root: one existed, drifted
+#     3.5 weeks out of date, and was removed.)
 # ---------------------------------------------------------------------------
 *.pdf
 !paper/thz_ml_maxactive.pdf

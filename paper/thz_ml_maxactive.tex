@@ -1,4 +1,4 @@
-﻿\documentclass[journal]{IEEEtran}
+\documentclass[journal]{IEEEtran}
 
 \usepackage[T1]{fontenc}
 \usepackage{amsmath,amssymb,amsfonts}
@@ -45,20 +45,23 @@
 
 % --- measured quantities (Section U of the companion notebook); single source of truth ---
 \newcommand{\PLNCH}{11\,700}          % active channels per context
-\newcommand{\PLMASEL}{$126$~ms}       % MaxActive threshold sweep, decision only
-\newcommand{\PLMASTEP}{$141$~ms}      % MaxActive full link update, fixed beam
-\newcommand{\PLMASTEPBW}{$144$~ms}    % MaxActive full link update, + beamwidth search
-\newcommand{\PLPREDUS}{$1.3$~ms}      % surrogate: feature extraction + inference
+\newcommand{\PLMASEL}{$77$~ms}        % MaxActive threshold sweep, decision only
+\newcommand{\PLMASTEP}{$95$~ms}       % MaxActive full link update, fixed beam (11 contexts)
+\newcommand{\PLMASTEPBW}{$91$~ms}     % + beamwidth search (the 3 comparable contexts)
+\newcommand{\PLPREDUS}{$0.9$~ms}      % surrogate: feature extraction + inference
 
 \begin{document}
 
 \title{Machine-Learning Surrogates for MaxActive Channel Selection in\\
 Terahertz Drone-to-Drone Communications}
 
-\author{Korhan Erdo\u{g}du, \"Ozg\"ur G\"urb\"uz, and Akhtar Saeed%
-\thanks{Manuscript prepared July 2026. The authors are with the Faculty of
-Engineering and Natural Sciences, Sabanc\i{} University, Istanbul, Turkey (e-mail:
-korhan.erdogdu@sabanciuniv.edu; ogurbuz@sabanciuniv.edu; akhtar.saeed@sabanciuniv.edu).
+\author{Korhan Erdo\u{g}du, \"Ozg\"ur G\"urb\"uz, Akhtar Saeed, and Mikail Erdem%
+\thanks{Manuscript prepared July 2026. K.~Erdo\u{g}du, \"O.~G\"urb\"uz and M.~Erdem are
+with the Faculty of Engineering and Natural Sciences, Sabanc\i{} University, Istanbul,
+Turkey; \"O.~G\"urb\"uz is a Professor and M.~Erdem is a Postdoctoral Researcher and
+Instructor there (e-mail: korhan.erdogdu@sabanciuniv.edu; ozgur.gurbuz@sabanciuniv.edu;
+mikail@sabanciuniv.edu). A.~Saeed is an Assistant Professor with Kadir Has University,
+Istanbul, Turkey (e-mail: akhtarsaeed@sabanciuniv.edu).
 K.~Erdo\u{g}du is the main contributor; \"O.~G\"urb\"uz and A.~Saeed supervised the
 project. \emph{(Corresponding author: Korhan Erdo\u{g}du.)}}}
 
@@ -71,20 +74,19 @@ project. \emph{(Corresponding author: Korhan Erdo\u{g}du.)}}}
 \begin{abstract}
 Terahertz (THz) drone-to-drone links promise multi-gigabit capacity, but channel quality
 is highly sensitive to distance, molecular absorption, and mobility-induced beam
-misalignment. The MaxActive algorithm returns the capacity-maximizing channel subset, yet
-it is search-based and must be re-executed at every geometry update, which makes its
-per-update cost the bottleneck for an airborne platform. This correspondence asks whether
-machine learning can supply a low-complexity surrogate for that search. From a
-physics-consistent THz model we reproduce the MaxActive capacity for four mobility
-patterns and benchmark eighteen regressors under a leakage-safe nested cross-validation
-protocol. A Gaussian process reproduces the reference with a cross-validated $R^2$ of
-$0.99$, whereas single decision trees, plain boosting, and unregularized linear regression
-fail and overshoot the physical bound most severely. A dueling double deep $Q$-network,
-formulated as a single-step contextual bandit, instead learns the \emph{selection} itself,
-so it cannot exceed the reference and matches it to within $0.1\%$ on average. The learned
-decision costs \PLPREDUS{} against \PLMASEL{} for the search it replaces, from a stored
-model of a few kilobytes, and the accompanying complexity analysis shows the most accurate
-models to be the most expensive, with tree ensembles the better compromise at scale.
+misalignment. The MaxActive algorithm returns the capacity-maximizing channel subset, but
+it is search-based and must be re-executed at every geometry update, so its per-update
+cost becomes the bottleneck for an airborne platform. This correspondence asks whether
+machine learning can supply a low-complexity surrogate. From a physics-consistent THz
+model we reproduce the MaxActive capacity for four mobility patterns and benchmark
+eighteen regressors under a leakage-safe nested cross-validation protocol. A Gaussian
+process tracks the reference most closely, whereas single decision trees, plain boosting,
+and unregularized linear regression overshoot the physical bound. A dueling double deep
+$Q$-network (D3QN), formulated as a single-step contextual bandit rather than a sequential
+reinforcement-learning problem, learns the \emph{selection} itself and therefore cannot
+exceed the reference, at the cost of per-context training. The learned decision is about
+two orders of magnitude cheaper than the search it replaces and is stored in a few
+kilobytes.
 \end{abstract}
 
 \begin{IEEEkeywords}
@@ -117,14 +119,14 @@ repeatedly evaluates capacity while sweeping a signal-to-noise ratio (SNR) thres
 and it must be re-executed whenever the geometry changes.
 
 \emph{Why a surrogate is needed.} That search cost is not incidental. The sweep
-re-evaluates capacity across every channel of a wide THz band, so a single selection takes
-tens of milliseconds on a desktop CPU. Aerial mobility perturbs the geometry
-continuously, so the search must run at the geometry-update rate, on an embedded processor
-that is simultaneously flying the aircraft. A learned model returns the same decision
-roughly two orders of magnitude faster and moves the training burden offline;
-Section~\ref{sec:complexity} reports the underlying complexity and measurements. The
-research question is therefore whether a learned \emph{surrogate} can reproduce the
-MaxActive decision directly from the channel state at a fraction of the cost.
+re-evaluates capacity across every channel of a wide THz band, so a single selection
+dominates the per-update budget. Aerial mobility perturbs the geometry continuously, so
+the search must run at the geometry-update rate, on an embedded processor that is
+simultaneously flying the aircraft. A learned model returns the same decision at a small
+fraction of that cost and moves the training burden offline;
+Section~\ref{sec:complexity} reports the complexity and the measurements behind this
+claim. The research question is therefore whether a learned \emph{surrogate} can reproduce
+the MaxActive decision directly from the channel state at a fraction of the cost.
 
 We pursue two complementary answers: \emph{supervised regressors} that predict the
 MaxActive capacity value from a compact set of physical features, and a \emph{dueling
@@ -140,8 +142,8 @@ learning.
 model families as surrogates for THz channel selection, under a leakage-safe nested
 cross-validation protocol suited to this small-sample, wide-dynamic-range regime.
 (iii) The contrast between learning the capacity \emph{value} and learning the selection
-\emph{decision}; the latter matches MaxActive to within $0.1\%$ on average and cannot
-violate the physical bound.
+\emph{decision}; the latter closely matches MaxActive and cannot violate the physical
+bound, at the cost of per-context training discussed in Section~\ref{sec:d3qn}.
 (iv) A deployment-oriented complexity analysis that combines asymptotic cost with
 \emph{measured} execution time and memory footprint.
 These four threads --- ground truth, surrogate benchmark, value-versus-decision, and
@@ -174,19 +176,23 @@ The models fall into two categories. Supervised regressors reproduce the capacit
 \emph{value}: cheap at inference, but able to exceed the reference bound, which is what
 makes unclipped reporting necessary. The D3QN reproduces the selection \emph{decision};
 since it evaluates the real capacity of the channels it selects, it is bounded above by
-MaxActive automatically and needs no clip at all. Fig.~\ref{fig:allmethods} overlays all
-methods on the MaxActive curves for the aligned and diagonal scenarios.
+MaxActive automatically and needs no clip at all. Fig.~\ref{fig:allmethods} overlays one
+representative of each model family, together with the D3QN, on the MaxActive curves for
+the aligned and diagonal scenarios; Table~\ref{tab:cv} reports all eighteen regressors.
 
 \begin{figure*}[!tp]
 \centering
 \includegraphics[width=0.76\textwidth]{all_methods_comparison.png}
-\caption{All methods versus MaxActive. Rows are mobility scenarios and columns are power
-allocations: (a),(b) aligned; (c),(d) misaligned diagonal without beamwidth adjustment;
-(e),(f) misaligned diagonal with beamwidth adjustment; WF in (a),(c),(e) and EP in
-(b),(d),(f). Curves are models fit on all $33$ samples, evaluated at the MaxActive
-ceiling \eqref{eq:clip} for display only, and smoothed by monotone (PCHIP)
-interpolation; markers denote the true computed points. The D3QN policy is shown on the
-EP column. Note the logarithmic capacity axis.}
+\caption{Learned surrogates versus MaxActive. For legibility one representative of each
+model family is plotted --- Ridge (regularized linear), Huber (robust), $k$-NN
+(instance-based), MLP (neural), GaussProc (kernel/probabilistic) and ExtraTrees (tree
+ensemble); the complete eighteen-model comparison is given in Table~\ref{tab:cv}. Rows are
+mobility scenarios and columns are power allocations: (a),(b) aligned; (c),(d) misaligned
+diagonal without beamwidth adjustment; (e),(f) misaligned diagonal with beamwidth
+adjustment; WF in (a),(c),(e) and EP in (b),(d),(f). Curves are models fit on all $33$
+samples, evaluated at the MaxActive ceiling \eqref{eq:clip} for display only, and smoothed
+by monotone (PCHIP) interpolation; markers denote the true computed points. The D3QN
+policy is shown on the EP column. Note the logarithmic capacity axis.}
 \label{fig:allmethods}
 \end{figure*}
 
@@ -206,23 +212,21 @@ and the MLP is a flexible approximator. The tree ensembles are strong tabular le
 but their piecewise-constant form cannot extrapolate the wide dynamic range. All models
 use scikit-learn \cite{sklearn} except XGBoost \cite{xgboost}.
 
-\emph{Why these eighteen suffice.} The set is representative rather than exhaustive: it
-covers every hypothesis class standard for small-sample tabular regression and, within
+\emph{Why these eighteen are enough.} The set is representative rather than exhaustive: it
+covers the hypothesis classes commonly used for small-sample tabular regression and, within
 each, spans the inductive biases that could plausibly differ on this target. The linear
 family appears at all four regularization regimes (none, $\ell_2$, $\ell_1$, elastic net)
-plus an evidence-based variant, which separates bias due to the affine hypothesis from
-bias due to the penalty; a robust (Huber) variant isolates sensitivity to the extreme
-dynamic range. The kernel family appears in deterministic and probabilistic forms, which
-share a smoothness prior but set it differently. The tree family spans bagging, randomized
-splitting, and sequential boosting, with a single DecisionTree as the unregularized
-contrast that exposes the piecewise-constant failure mode. Since models within a family
-behave alike here while families differ by orders of magnitude in error
-(Table~\ref{tab:cv}), adding members of an existing family would not change the
-conclusion, whereas omitting a family could. One further candidate, histogram gradient
-boosting, was implemented and discarded: designed for large-$n$ binned data, it degenerates
-on $33$ samples (negative cross-validated $R^2$). The benchmark is thus diagnostic:
-observing which \emph{families} track MaxActive yields a defensible recommendation rather
-than a single tuned result.
+plus an evidence-based variant, which separates bias due to the affine hypothesis from bias
+due to the penalty, and a robust (Huber) variant isolates sensitivity to the extreme
+dynamic range. The kernel family appears in deterministic and probabilistic forms, and the
+tree family spans bagging, randomized splitting, and sequential boosting, with a single
+DecisionTree as the unregularized contrast. Models within a family behave alike here while
+families differ by orders of magnitude in error (Table~\ref{tab:cv}), so adding further
+members of an existing family is unlikely to alter the ranking, whereas omitting a family
+could. One further candidate, histogram gradient boosting, was implemented and discarded:
+designed for large-$n$ binned data, it degenerates on $33$ samples (negative
+cross-validated $R^2$). The benchmark is therefore diagnostic, supporting a recommendation
+at the level of families rather than a single tuned result.
 
 \section{Background: System Model and Algorithms}
 \label{sec:background}
@@ -329,7 +333,8 @@ toward the best achievable $C_{\max}$. The network uses the dueling decompositio
 advantage stream $A(\mathbf{s},a)$, and it is trained with the double-DQN target
 \cite{vanhasselt,mnih} under a smooth-$\ell_1$ loss.
 
-\emph{This is a contextual bandit, not sequential RL.} We stress the formulation because
+\emph{This is a contextual bandit, not sequential reinforcement learning.} We stress the
+formulation because
 it departs from the usual reading of a ``deep $Q$-network.'' The problem is
 \emph{single-step}: for a given geometry the channel state $\mathbf{s}$ is fixed, the
 agent takes one action, receives one reward, and the episode terminates. Selecting
@@ -338,14 +343,27 @@ and the physics rather than by the previous action. With no transition to influe
 horizon is one and the discount is zero, so $Q(\mathbf{s},a)$ reduces to an estimate of
 the immediate reward and the model is a contextual $k$-armed bandit with $k=600$ arms.
 
-Two consequences follow. The mechanisms that make deep RL fragile --- bootstrapping bias,
-moving targets, reward delay --- are absent, which is why training converges in $20$ epochs
-across all four mobility patterns. And the near-exact agreement with MaxActive reported
-later is not evidence that deep RL solved a hard sequential control problem; it shows that
-a learned one-shot rule can reproduce a search whose structure is itself memoryless. We
-retain the dueling and double-$Q$ machinery for fidelity to \cite{wang,vanhasselt}, but
-claim no sequential decision-making. Generalizing the per-context bandits into a single
-geometry-conditioned policy is left as future work.
+Two consequences follow. The mechanisms that make deep reinforcement learning fragile ---
+bootstrapping bias, moving targets, reward delay --- are absent, which is why training
+converges in $20$ epochs across all four mobility patterns. And the close agreement with
+MaxActive reported later is not evidence that deep reinforcement learning solved a hard
+sequential control problem; it shows that a learned one-shot rule can reproduce a search
+whose structure is itself memoryless. We retain the dueling and double-$Q$ machinery for
+fidelity to \cite{wang,vanhasselt}, but claim no sequential decision-making.
+
+\emph{Operation at an unseen geometry, and its cost.} The policy is fitted per operating
+context, one lightweight network for each (distance, gain) pair. This is a real
+restriction and we state it as such: a previously unseen geometry is not covered by an
+already-trained network, and obtaining a policy for it requires its own training run.
+That run is short in absolute terms (Section~\ref{sec:runtime}), but it is an offline
+cost, so the present D3QN branch suits a trajectory envelope that can be enumerated and
+trained for in advance rather than an arbitrary geometry encountered in flight. The
+supervised branch does not share this restriction: a single fitted regressor maps the
+feature vector of any geometry inside the trained envelope to a capacity estimate. Two
+routes would lift the restriction, and both are left to future work: conditioning one
+network on the same geometry descriptors the regressors already use, so that a single
+policy spans the trajectory space; or training a bank of policies offline and selecting
+among them by nearest context at run time.
 
 \section{Problem Description}
 \label{sec:problem}
@@ -481,7 +499,7 @@ keeping the generalization estimate independent of the clip.
 
 The D3QN operates on individual SNR-ranked channels (top $N=500$, a $1000$-dimensional
 state) at the same granularity as MaxActive-EP, with one lightweight bandit per
-(distance, gain) context; the dueling network maps $1000\!\to\!16\!\to\!8$ to value and
+(distance, gain) context. The dueling network maps $1000\!\to\!16\!\to\!8$ to value and
 advantage heads over $600$ actions, trained for $20$ epochs of $80$ $\epsilon$-greedy
 actions (Adam, learning rate $10^{-3}$, weight decay $10^{-4}$).
 
@@ -587,15 +605,15 @@ ExtraTrees   & $2.7\%$ & $12.2\%$ & $24.6\%$\\
 
 \subsection{Mobility Scenarios and D3QN}
 Extending the benchmark to the elevation and real-trace mobility patterns,
-Fig.~\ref{fig:mlmob} overlays the ML predictions and the D3QN policy on the MaxActive
-curves. Fitting on all data, the strongest models reproduce
+Fig.~\ref{fig:mlmob} overlays one representative per model family and the D3QN policy on
+the MaxActive curves. Fitting on all data, the strongest models reproduce
 these curves closely: XGBoost, GradBoost, and GaussProc reach median relative errors of
 $0.07\%$, $0.7\%$, and $2.8\%$ over the elevation and real scenarios (Huber, $4.4\%$, is
 next). Note that this is an in-sample fit, so it flatters models such as GradBoost that
 fail under cross-validation --- which is precisely why Table~\ref{tab:cv}, not this fit,
 is the basis for the ranking. Otherwise the family ordering of Table~\ref{tab:cv} is
-visible: the smooth and kernel models hug the reference while the single tree and plain
-linear model lag.
+visible in the figure: the kernel and instance-based representatives hug the reference
+while the linear ones lag.
 The D3QN, trained as a single-step contextual bandit at every trajectory point
 (Section~\ref{sec:background}-C), reproduces the MaxActive EP capacity essentially
 exactly on \emph{all seven} scenario variants: the mean capacity ratio is $99.9\%$ for
@@ -613,8 +631,10 @@ not that it improved on the reference or solved a harder problem.
 \begin{figure*}[!tp]
 \centering
 \includegraphics[width=0.92\textwidth]{ml_mobility_comparison.png}
-\caption{All eighteen regressors and the D3QN versus MaxActive on the two additional
-mobility patterns, under EP allocation: elevation mobility (a) without and (b) with
+\caption{Learned surrogates versus MaxActive on the two additional mobility patterns,
+under EP allocation. As in Fig.~\ref{fig:allmethods}, one representative per model family
+is plotted and the full eighteen-model comparison is tabulated: elevation mobility (a)
+without and (b) with
 beamwidth adjustment, and real windy-hover traces (c) without and (d) with adjustment.
 Without adjustment the elevation capacity falls to a side-lobe plateau once $\phi$ leaves
 the beam, whereas adjustment gives a gradual decline; in the real traces the diagonal
@@ -645,8 +665,10 @@ the validated regime to interpolation within the trained envelope
 itself optimal only within its threshold-search family (Section~\ref{sec:background}-B),
 so they inherit that scope rather than approximating a globally optimal selector. The
 regressors predict the capacity value rather than the selection mask, so a deployment that
-needs the mask must use the D3QN branch, and the D3QN is in turn realized as per-context
-bandits rather than a single geometry-generalizing policy (Section~\ref{sec:d3qn}).
+needs the mask must use the D3QN branch. That branch is in turn realized as per-context
+bandits rather than a single geometry-generalizing policy, so a previously unseen geometry
+requires its own offline training run before the policy applies to it
+(Section~\ref{sec:d3qn}).
 Finally, all timings in Section~\ref{sec:complexity} come from a laptop-class CPU, so
 absolute latencies on an embedded airborne processor will be larger. The
 platform-independent quantity is the \emph{ratio} between search and surrogate, since both
@@ -658,9 +680,9 @@ slow down together on weaker hardware.
 \subsection{Asymptotic Cost}
 MaxActive has per-step cost $O(Q\,|\mathcal{F}|)$ and must be re-run whenever the geometry
 changes; it needs no training but incurs this search at every time step. The supervised
-surrogates move that cost offline: the entire nested-CV benchmark of $18$ models over both
-targets completes in about $80$~s on a CPU, dominated by the grid searches, and fitting
-the $18$ deployable models on the full dataset takes $0.9$~s; afterwards a prediction is a
+surrogates move that cost offline. The entire nested-CV benchmark of $18$ models over both
+targets completes in about $30$~s on a CPU, dominated by the grid searches, and fitting
+the $18$ deployable models on the full dataset takes $0.5$~s. Afterwards a prediction is a
 single forward, kernel, or neighbor evaluation. Table~\ref{tab:complexity} summarizes the
 asymptotic training and prediction complexity of representative families ($n$ samples,
 $d$ features, $T$ trees, $W$ network weights, $n_{sv}$ support vectors) together with
@@ -674,24 +696,25 @@ identical channel states, on a single core of an Intel Core i7-13620H with the b
 discretized into $|\mathcal{F}|=\PLNCH$ active channels per context; the measured columns
 of Table~\ref{tab:complexity} average the eleven aligned contexts.
 
-The reference costs \PLMASEL{} for the threshold sweep alone, \PLMASTEP{} for a complete
-link update with power allocation iterated to convergence, and \PLMASTEPBW{} with the
-beamwidth search included, i.e., $1.2\times$ the fixed-beam cost on the same geometries.
-Against this, the surrogate path costs $1.26$~ms to turn the channel state into the $13$
-features and $31$--$63$~$\mu$s to evaluate a linear, kernel, or Gaussian-process model:
-\PLPREDUS{} end-to-end, a $95\times$ reduction in per-update decision cost. Where that
+The reference costs \PLMASEL{} for the threshold sweep alone and \PLMASTEP{} for a
+complete link update with power allocation iterated to convergence. On the three
+geometries where both variants were timed, adding the beamwidth search raises that update
+from $72$~ms to \PLMASTEPBW{}, i.e., $1.3\times$ the fixed-beam cost.
+Against this, the surrogate path costs $0.84$~ms to turn the channel state into the $13$
+features and $21$--$43$~$\mu$s to evaluate a linear, kernel, or Gaussian-process model:
+\PLPREDUS{} end-to-end, an $88\times$ reduction in per-update decision cost. Where that
 factor comes from is worth stating precisely. The model evaluation alone is
-$2000$--$4000\times$ faster than the search, but feature extraction now dominates the
+$1800$--$3700\times$ faster than the search, but feature extraction now dominates the
 online path. The end-to-end gain therefore saturates near two orders of magnitude, and
 \emph{feature extraction, not inference, is the target for further optimization}. The
-tree ensembles are the exception at the other end: they need $5.5$--$19$~ms per prediction
+tree ensembles are the exception at the other end: they need $3.0$--$12$~ms per prediction
 because hundreds of estimators must each be traversed, cutting their advantage to
-$6$--$19\times$ and making them a poor per-update choice at this dataset size despite
-their accuracy. The D3QN is the fastest decision of all: its state is built from the SNR
-ranking MaxActive computes anyway ($0.83$~ms, shared by both), after which a forward pass
-and $\arg\max$ take $0.11$~ms --- three orders of magnitude below the search --- and it
-returns the selection itself rather than a capacity estimate. Its cost is paid offline:
-$0.38$~s per context, about $13$~s for the $33$ contexts of the main study.
+$6$--$20\times$ and making them a poor per-update choice at this dataset size despite
+their accuracy. The D3QN is the fastest decision of all. Its state is built from the SNR
+ranking MaxActive computes anyway ($0.55$~ms, shared by both), after which a forward pass
+and $\arg\max$ take $0.05$~ms, three orders of magnitude below the search. It also returns
+the selection itself rather than a capacity estimate. Its cost is paid offline:
+$0.11$~s per context, about $4$~s for the $33$ contexts of the main study.
 
 \subsection{Memory Footprint and Airborne Deployment}
 \label{sec:deploy}
@@ -703,16 +726,18 @@ fits in the on-chip memory of a microcontroller-class flight companion, and all 
 below the LBLRTM tables the reference search itself must hold. Only the tree ensembles
 are heavy --- XGBoost
 $522$~KB and ExtraTrees $1.4$~MB --- which, together with their millisecond-scale
-inference, rules them out here despite their accuracy. Three further properties favor
-deployment. Inference cost is constant and data independent, a fixed number of
+inference, make them a poor fit here despite their accuracy. Three further properties
+favor deployment. Inference cost is constant and data independent, a fixed number of
 multiply-accumulates with no search, iteration, or early exit, so the decision has a hard
 worst-case latency that a threshold sweep of state-dependent length cannot offer. All
 training is offline, so the platform performs no gradient computation and needs no
 floating-point accelerator. And the arithmetic compresses further: an $8$-bit D3QN would
-occupy $21$~KB, and the linear surrogates reduce to a $13$-element dot product. The
-recommendation is therefore the Gaussian process where accuracy dominates ($18$~KB,
-$63$~$\mu$s) and the D3QN where the selection mask is needed ($84$~KB, $0.11$~ms), with
-the tree ensembles reserved for offline or ground-station use.
+occupy $21$~KB, and the linear surrogates reduce to a $13$-element dot product. On these
+grounds the Gaussian process is the better choice where accuracy dominates ($18$~KB,
+$43$~$\mu$s) and the D3QN where the selection mask is needed ($84$~KB, $0.05$~ms, subject
+to the per-context training of Section~\ref{sec:d3qn}), with the tree ensembles reserved
+for offline or ground-station use. These figures indicate feasibility on the memory and
+latency budgets of a flight companion; a full airborne demonstration remains future work.
 
 \begin{table*}[!tp]
 \centering
@@ -728,21 +753,21 @@ the tree ensembles reserved for offline or ground-station use.
 \cmidrule(lr){2-3}\cmidrule(lr){4-6}\cmidrule(lr){7-8}
 Model (family) & Training & Prediction & Train [ms] & Predict [ms] & Memory [KB] & $R^2$ & Med.\ rel.\ err.\\
 \midrule
-Ridge / Lasso (linear)            & $O(nd^2)$              & $O(d)$                    & $1.0$        & $0.039$          & $1.2$          & $0.97$          & $45\%$\\
-$k$-NN (instance-based)           & $O(1)$ (store)         & $O(nd)$                   & $0.7$        & $0.331$          & $7.6$          & $0.96$          & $9\%$\\
-DecisionTree (tree)               & $O(nd\log n)$          & $O(\text{depth})$         & $0.6$        & $0.043$          & $5.3$          & $0.93$          & $48\%$\\
-XGBoost / ExtraTrees (ensemble)   & $O(T\,nd\log n)$       & $O(T\,\text{depth})$      & $175$--$191$ & $0.82$--$19.5$   & $522$--$1362$  & $0.97$--$0.99$  & $12$--$37\%$\\
-MLP (neural)                      & $O(\text{it}\cdot nW)$ & $O(W)$                    & $82$         & $0.049$          & $70$           & $0.98$          & $21\%$\\
-SVR-RBF (kernel)                  & $O(n^2\!-\!n^3)$       & $O(n_{sv}d)$              & $1.3$        & $0.055$          & $4.6$          & $0.98$          & $8\%$\\
-\textbf{GaussProc} (kernel/prob.) & $O(n^3)$, mem $O(n^2)$ & $O(n)$ mean               & $22$         & $\mathbf{0.063}$ & $\mathbf{17.9}$ & $\mathbf{0.99}$ & $\mathbf{1.9\%}$\\
+Ridge / Lasso (linear)            & $O(nd^2)$              & $O(d)$                    & $0.7$        & $0.023$          & $1.2$          & $0.97$          & $45\%$\\
+$k$-NN (instance-based)           & $O(1)$ (store)         & $O(nd)$                   & $0.5$        & $0.211$          & $7.6$          & $0.96$          & $9\%$\\
+DecisionTree (tree)               & $O(nd\log n)$          & $O(\text{depth})$         & $0.4$        & $0.029$          & $5.3$          & $0.93$          & $48\%$\\
+XGBoost / ExtraTrees (ensemble)   & $O(T\,nd\log n)$       & $O(T\,\text{depth})$      & $76$--$103$  & $0.32$--$11.7$   & $522$--$1362$  & $0.97$--$0.99$  & $12$--$37\%$\\
+MLP (neural)                      & $O(\text{it}\cdot nW)$ & $O(W)$                    & $49$         & $0.031$          & $70$           & $0.98$          & $21\%$\\
+SVR-RBF (kernel)                  & $O(n^2\!-\!n^3)$       & $O(n_{sv}d)$              & $0.8$        & $0.038$          & $4.6$          & $0.98$          & $8\%$\\
+\textbf{GaussProc} (kernel/prob.) & $O(n^3)$, mem $O(n^2)$ & $O(n)$ mean               & $14$         & $\mathbf{0.043}$ & $\mathbf{17.9}$ & $\mathbf{0.99}$ & $\mathbf{1.9\%}$\\
 \midrule
-MaxActive (reference)             & --- (online search)    & $O(Q|\mathcal{F}|)$ / step & ---         & $\mathbf{125.6}$ & ---            & reference       & ---\\
-D3QN (policy)                     & $O(E\cdot A)$ / context & $O(\text{forward pass})$  & $384$/ctx.  & $0.11$           & $84$           & $\approx$ ref.  & $\sim\!0\%$\\
+MaxActive (reference)             & --- (online search)    & $O(Q|\mathcal{F}|)$ / step & ---         & $\mathbf{76.8}$  & ---            & reference       & ---\\
+D3QN (policy)                     & $O(E\cdot A)$ / context & $O(\text{forward pass})$  & $115$/ctx.  & $0.05$           & $84$           & $\approx$ ref.  & $\sim\!0\%$\\
 \bottomrule
 \end{tabular}
 \vspace{2pt}
 \parbox{0.97\textwidth}{\footnotesize Prediction times are per operating point and exclude
-the $1.26$~ms feature extraction shared by all regressors (Section~\ref{sec:runtime}); the
+the $0.84$~ms feature extraction shared by all regressors (Section~\ref{sec:runtime}); the
 MaxActive row is the threshold sweep alone, on the same channel states. Memory is the
 serialized model size; for the D3QN it is $21\,561$ parameters in single precision.}
 \end{table*}
@@ -760,14 +785,15 @@ super-linear price in the number of samples.
 
 Two regimes invert the recommendation, however. At the present scale ($n\le60$) the
 asymptotic penalty is invisible in wall-clock terms: the Gaussian process trains in
-$22$~ms and predicts in $63$~$\mu$s, cheaper at inference than $k$-NN or any ensemble. The
-most accurate model can therefore simply be chosen, and GaussProc is the recommended
-surrogate here. What costs time at this scale is the number of estimators rather than the
-asymptotic class, which is why the tree ensembles are the slowest predictors in the table.
-As $n$ grows toward the $10^4$--$10^6$ samples of Section~\ref{sec:dataset}, the cubic
-training and quadratic memory of the kernel methods become prohibitive while the ensembles
-amortize their per-tree overhead, and the sweet spot shifts to XGBoost and ExtraTrees. The
-rule is: kernel methods while the dataset is small, tree ensembles once it is not.
+$14$~ms and predicts in $43$~$\mu$s, cheaper at inference than $k$-NN or any ensemble. The
+most accurate model can therefore be chosen without a practical penalty, and GaussProc is
+the surrogate we recommend at this scale. What costs time here is the number of estimators
+rather than the asymptotic class, which is why the tree ensembles are the slowest
+predictors in the table. As $n$ grows toward the $10^4$--$10^6$ samples of
+Section~\ref{sec:dataset}, the cubic training and quadratic memory of the kernel methods
+become prohibitive while the ensembles amortize their per-tree overhead, and the balance
+shifts to XGBoost and ExtraTrees. A reasonable guideline is therefore to prefer kernel
+methods while the dataset is small and tree ensembles once it is not.
 
 Convergence is not a limiting factor for either learned method. The D3QN converges for the
 structural reason given in Section~\ref{sec:background}-C --- each context is a single-step
@@ -790,13 +816,17 @@ a policy that selects channels and reports the capacity its choice actually deli
 inherits the reference's feasibility guarantee, whereas a value regressor can predict a
 rate the link cannot support.
 
-The practical implication is that the surrogate is limited by feature extraction rather
-than by inference, and that its memory footprint suits a microcontroller-class flight
-computer. The accuracy-optimal model can therefore be deployed as is; only as the dataset
-grows by orders of magnitude does the super-linear cost of the kernel methods force a
-switch to tree ensembles. Future work will replace the per-context bandits with a single
-geometry-generalizing policy, predict the selection mask rather than the capacity value,
-and extend the dataset into the regime where that trade-off binds.
+Practically, the surrogate is limited by feature extraction rather than by inference, and
+its memory footprint is compatible with a microcontroller-class flight computer. The
+accuracy-optimal model therefore appears deployable at this scale, and only as the dataset
+grows by orders of magnitude does the super-linear cost of the kernel methods favor tree
+ensembles.
+Two caveats bound this. The D3QN branch is trained per operating context, so it covers a
+pre-enumerated trajectory envelope rather than an arbitrary unseen geometry, and all
+timings come from a laptop-class CPU. Future work will therefore replace the per-context
+bandits with a single geometry-generalizing policy, predict the selection mask rather than
+the capacity value, validate on embedded hardware, and extend the dataset into the regime
+where the complexity trade-off binds.
 
 \begin{thebibliography}{10}
 \bibitem{jornet}

@@ -48,8 +48,8 @@ cost scales with the number of channels (≈11,700 per context).
 The question this repository answers: **can a learned model replace that online search?**
 A surrogate turns a state-dependent sweep into a constant-cost evaluation with a hard
 worst-case latency — attractive on an airborne platform. Measured on one core, the
-MaxActive threshold sweep takes **126 ms** per context while the full surrogate path
-(feature extraction + inference) takes **1.3 ms**, a ~95× reduction.
+MaxActive threshold sweep takes **77 ms** per context while the full surrogate path
+(feature extraction + inference) takes **0.9 ms**, an ~88× reduction.
 
 ---
 
@@ -285,20 +285,20 @@ shared channel state.
 
 | Path | Cost |
 |---|---|
-| MaxActive threshold sweep | **126 ms** |
-| Full link update | 141 ms (144 ms with beamwidth search — 1.2× the fixed-beam cost on the same geometries) |
-| Surrogate: feature extraction | 1.26 ms |
-| Surrogate: inference | 31–63 µs |
-| **Surrogate end-to-end** | **1.3 ms (~95×)** |
-| D3QN | shared SNR ranking 0.83 ms + forward pass 0.11 ms; 0.38 s training per context |
+| MaxActive threshold sweep | **77 ms** |
+| Full link update | 95 ms (11 aligned contexts); on the 3 contexts where both were timed, adding the beamwidth search gives 72 → 91 ms, i.e. 1.3× |
+| Surrogate: feature extraction | 0.84 ms |
+| Surrogate: inference | 21–43 µs |
+| **Surrogate end-to-end** | **0.9 ms (~88×)** |
+| D3QN | shared SNR ranking 0.55 ms + forward pass 0.05 ms; 0.11 s training per context |
 
-The model evaluation alone is 2000–4000× faster than the sweep, so **feature extraction,
+The model evaluation alone is 1800–3700× faster than the sweep, so **feature extraction,
 not inference, now dominates** the surrogate path — that is the next optimization target.
-Tree ensembles are the exception (5.5–19 ms/predict → only 6–19×).
+Tree ensembles are the exception (3.0–12 ms/predict → only 6–20×).
 
 > ⚠️ **Timings are the only non-reproducible numbers here and they vary several-fold with
-> machine load** — the same sweep has measured 81 ms, 623 ms and 118–126 ms across runs
-> of identical code (±5% on an idle machine, 5× worse on a contended one). Memory footprints, parameter counts and every accuracy metric are
+> machine load** — the same sweep has measured 77–81 ms (idle), 118–134 ms (lightly
+> loaded) and 623 ms (contended) across runs of identical code. Memory footprints, parameter counts and every accuracy metric are
 > bit-identical across runs. Benchmark on an idle machine before quoting these.
 
 **Memory:** linear 1.2–2.2 KB · SVR 4.6 KB · GaussProc 17.9 KB · MLP 70 KB ·
@@ -310,7 +310,7 @@ D3QN 84 KB (21 KB at 8-bit) · XGBoost 522 KB · ExtraTrees 1.4 MB.
 
 **Recommendation:** GaussProc where accuracy dominates; D3QN where the selection *mask*
 is needed; tree ensembles offline only. At n ≤ 60 the asymptotic penalty is invisible
-(GaussProc trains in 22 ms) so pick the most accurate — as n grows toward 10⁴–10⁶ the
+(GaussProc trains in 14 ms) so pick the most accurate — as n grows toward 10⁴–10⁶ the
 cubic kernel cost binds and tree ensembles take over. *Kernel methods while the dataset
 is small, tree ensembles once it is not.*
 
@@ -324,8 +324,10 @@ fonts — see [Gotchas](#gotchas-for-anyone-extending-this).
 
 ### Paper figures
 
-**`all_methods_comparison.png`** — all 18 regressors + D3QN against MaxActive, over the
-aligned and diagonal scenarios × WF/EP, evaluated at the ceiling.
+**`all_methods_comparison.png`** — one representative per model family (Ridge, Huber,
+k-NN, MLP, GaussProc, ExtraTrees) plus D3QN against MaxActive, over the aligned and
+diagonal scenarios × WF/EP, evaluated at the ceiling. The full 18-model comparison is
+tabulated rather than plotted, which keeps the panels legible.
 
 ![All methods vs MaxActive](all_methods_comparison.png)
 
@@ -335,7 +337,7 @@ log axis (they occupy disjoint decades), WF in thick colour with the EP overlay 
 ![MaxActive reference](maxactive_reference_single.png)
 
 **`ml_mobility_comparison.png`** — elevation and real-trace mobility, EP only (WF is
-omitted because it coincides with EP).
+omitted because it coincides with EP). Same family representatives as Fig. 1.
 
 ![ML on the additional mobility patterns](ml_mobility_comparison.png)
 
@@ -416,8 +418,8 @@ python -m nbconvert --to notebook --execute --inplace thz_d3qn_v4.ipynb
 ```
 
 **~6 minutes wall clock** on an idle machine. Measured sub-steps: the three base
-scenarios × 2 allocations ≈ 9 s, D3QN training over 33 contexts 18.4 s, nested CV
-80.3 s. The bulk of the time is
+scenarios × 2 allocations ≈ 7 s, D3QN training over 33 contexts 6.2 s, nested CV
+29.7 s. The bulk of the time is
 the beamwidth-optimizing physics sweeps in Sections M.2/T (60 mobility contexts, each
 running `antenna_gain_optim`) plus the Section U benchmark.
 
@@ -517,8 +519,12 @@ Neither PDF is redistributed in this repository.
 
 ## Citation and authors
 
-**Korhan Erdoğdu** (main contributor), **Özgür Gürbüz**, **Akhtar Saeed** — Sabancı
-University.
+- **Korhan Erdoğdu** — main contributor, Sabancı University
+- **Özgür Gürbüz** — Professor, Sabancı University (supervised)
+- **Akhtar Saeed** — Assistant Professor, Kadir Has University (supervised)
+- **Mikail Erdem** — Postdoctoral Researcher and Instructor, Sabancı University
 
-*Machine-Learning-Based Channel Selection for THz-Band Drone-to-Drone Communications*,
-IEEE correspondence (source in [`paper/thz_ml_maxactive.tex`](paper/thz_ml_maxactive.tex)).
+*Machine-Learning Surrogates for MaxActive Channel Selection in Terahertz Drone-to-Drone
+Communications*, IEEE correspondence — source in
+[`paper/thz_ml_maxactive.tex`](paper/thz_ml_maxactive.tex), compiled PDF in
+[`paper/thz_ml_maxactive.pdf`](paper/thz_ml_maxactive.pdf).
