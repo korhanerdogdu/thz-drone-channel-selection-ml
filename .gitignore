@@ -25,14 +25,11 @@ dist/
 #   * Joint_Resource_Allocation_..._June2024.pdf and d3qn.pdf are third-party
 #     published papers (redistribution is not ours to grant) -- they are cited
 #     in the README instead.
-#   * paper/thz_ml_maxactive.pdf is OUR paper and is tracked (negated below).
-#     (There is deliberately no second copy in the repo root: one existed, drifted
-#     3.5 weeks out of date, and was removed.)
+#   * paper_taes/thz_ml_spectrum_allocation.pdf is OUR paper (TAES Correspondence)
+#     and is tracked, together with the vector figures it includes (negated below).
+#     (The superseded IEEEtran version in paper/ was removed in Oct 2026.)
 # ---------------------------------------------------------------------------
 *.pdf
-!paper/thz_ml_maxactive.pdf
-# TAES Correspondence revision (Oct 2026): the compiled manuscript and the vector
-# figures it includes are ours and are tracked.
 !paper_taes/thz_ml_spectrum_allocation.pdf
 !paper_taes/figures/*.pdf
 

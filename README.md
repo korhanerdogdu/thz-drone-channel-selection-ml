@@ -1,15 +1,27 @@
-# Machine-Learning Channel Selection for THz Drone-to-Drone Links
+# Machine Learning Based Spectrum Allocation for THz UAV Communications
 
-Learned low-complexity surrogates — **18 supervised regressors** and a **D3QN policy** —
-for the **MaxActive** channel-selection algorithm in a Terahertz (THz) drone-to-drone
-link. Everything in this repository is generated from the reference MATLAB model in
+Machine-learning alternatives for **spectrum allocation (channel selection)** in Terahertz
+(THz) links between unmanned aerial vehicles (UAVs). In this band, molecular absorption
+splits the spectrum into frequency-dependent transmission windows, and mobility misaligns
+the narrow beams. The existing threshold-search method, **MaxActive**, returns the best
+channel set within its search family, but it must repeat a search over ≈11,700 channels
+at every geometry update. This repository studies two learned alternatives that work
+from the same physical channel state:
+
+- **18 supervised regressors** (six model families) that predict the capacity the search
+  would deliver;
+- a **D3QN policy**, formulated as a single-step contextual bandit, that learns the
+  channel-selection decision itself.
+
+Everything is generated from the reference MATLAB model in
 [`TVT_Codes_Matlab/`](TVT_Codes_Matlab/): the LBLRTM molecular-absorption data, the
-trajectory geometry, and the physics. No value is read off a published figure.
+trajectory geometry, and the physics. **No value is read off a published figure.**
 
-The full pipeline — reference reproduction, supervised ML, and D3QN — lives in a single
-executable notebook, [`thz_d3qn_v4.ipynb`](thz_d3qn_v4.ipynb) (90 cells, Sections A–U),
-which is the authoritative deliverable. A 9-page IEEE correspondence written from its
-results is in [`paper/thz_ml_maxactive.tex`](paper/thz_ml_maxactive.tex).
+- **Code and results:** a single executable notebook,
+  [`thz_d3qn_v4.ipynb`](thz_d3qn_v4.ipynb) (90 cells, Sections A–U).
+- **Paper:** an IEEE Transactions on Aerospace and Electronic Systems (TAES)
+  Correspondence manuscript in [`paper_taes/`](paper_taes/), with the compiled
+  [`thz_ml_spectrum_allocation.pdf`](paper_taes/thz_ml_spectrum_allocation.pdf).
 
 ---
 
@@ -29,7 +41,7 @@ results is in [`paper/thz_ml_maxactive.tex`](paper/thz_ml_maxactive.tex).
 - [Notebook map](#notebook-map)
 - [Reproducing](#reproducing)
 - [Building the paper](#building-the-paper)
-- [Scope and limitations](#scope-and-limitations)
+- [Scope, limitations, and open items](#scope-limitations-and-open-items)
 - [Gotchas for anyone extending this](#gotchas-for-anyone-extending-this)
 - [References](#references)
 - [Citation and authors](#citation-and-authors)
@@ -38,25 +50,32 @@ results is in [`paper/thz_ml_maxactive.tex`](paper/thz_ml_maxactive.tex).
 
 ## Motivation
 
-THz link capacity depends on distance, antenna gain, beam alignment, beamwidth,
-free-space path loss, molecular absorption, noise power, and the per-channel SNR
-profile. **MaxActive** picks the set of active channels by sweeping an SNR threshold
-over SNR-ordered nested subsets and keeping the subset of maximum capacity. It is the
-reference method here — accurate, but it must re-run on every geometry change, and its
-cost scales with the number of channels (≈11,700 per context).
+THz link capacity depends on distance, molecular absorption and absorption noise,
+antenna gain, beamwidth and beam alignment, the selected channels, and the power
+allocation. Which channels to activate, and how to share the transmit power among them,
+therefore decides the achievable capacity: this is the **spectrum allocation problem**.
 
-The question this repository answers: **can a learned model replace that online search?**
-A surrogate turns a state-dependent sweep into a constant-cost evaluation with a hard
-worst-case latency — attractive on an airborne platform. Measured on one core, the
-MaxActive threshold sweep takes **77 ms** per context while the full surrogate path
-(feature extraction + inference) takes **0.9 ms**, an ~88× reduction.
+**MaxActive** [1] solves it by sweeping an SNR threshold over SNR-ordered nested channel
+subsets and keeping the subset of maximum capacity. It is the reference solution here,
+but the search is repeated at every geometry change, and its cost scales with the number
+of channels. A prior study [2] replaced it with a D3QN policy.
+
+**This work asks:**
+- Can simpler supervised models, trained on the same physical channel state, predict what
+  the search achieves?
+- What does each alternative cost in accuracy, physical feasibility, run time, memory, and
+  training effort?
+
+Measured on one core, the MaxActive threshold sweep takes **77 ms** per context, while a
+regressor's full online path (feature extraction + inference) takes **0.9 ms**, an
+~88× reduction.
 
 ---
 
 ## What is in this repository
 
 ```
-thz_d3qn_v4.ipynb                # MAIN deliverable — full pipeline, Sections A–U
+thz_d3qn_v4.ipynb                # MAIN code deliverable — full pipeline, Sections A–U
 README.md                        # this file
 
 TVT_Codes_Matlab/                # reference MATLAB model + all input data
@@ -66,75 +85,87 @@ TVT_Codes_Matlab/                # reference MATLAB model + all input data
   data_small_windy_average.mat   #   real windy-hover acceleration traces (USED)
   ITU_dist_*.mat, d*m*.mat       #   auxiliary MATLAB data (see note below)
 
-paper/
-  thz_ml_maxactive.tex           # IEEE correspondence source (IEEEtran), 9 pages
-  thz_ml_maxactive.pdf           # the compiled correspondence
-  *.png                          # figure copies used by the .tex
+paper_taes/                      # the paper — IEEE TAES Correspondence (15 pages)
+  thz_ml_spectrum_allocation.tex #   LaTeX source
+  thz_ml_spectrum_allocation.pdf #   compiled manuscript
+  references.bib                 #   28 verified references (DOIs where registered)
+  IEEEtaes.cls, IEEEtaes.bst     #   official TAES template files (unmodified)
+  REVISION_NOTES.md              #   change log and open issues of the Oct 2026 revision
+  figures/
+    maxactive_reference_single.png   # Fig. 1 (notebook output, unchanged)
+    fig_capacity_main.pdf/.png       # Fig. 2
+    fig_capacity_mobility.pdf/.png   # Fig. 3
+    fig_data.npz                     # the exact arrays plotted in Figs. 2–3
+    replot_paper_figures.py          # presentation-only re-plot of Figs. 2–3
 
 *.png                            # 17 figures generated by the notebook
 ```
 
-**Note on the auxiliary `.mat` files.** `ITU_dist_*.mat` (~51 MB) is referenced by
-neither the Python port nor `Main_Code.m`; it is kept for provenance with the original
-MATLAB drop. The small `d*m*.mat` files are read by `Main_Code.m` only. The Python
-pipeline needs exactly two things from this directory: the eleven `LBLRTM_*.mat`
-transmittance files and `data_small_windy_average.mat`.
+**Note on the auxiliary `.mat` files.**
+- The Python pipeline needs exactly two things from `TVT_Codes_Matlab/`: the eleven
+  `LBLRTM_*.mat` transmittance files and `data_small_windy_average.mat`.
+- `ITU_dist_*.mat` (~51 MB) is used by neither the Python port nor `Main_Code.m`; it is
+  kept for provenance with the original MATLAB drop.
+- The small `d*m*.mat` files are read by `Main_Code.m` only.
 
-**Not tracked in git** (see [`.gitignore`](.gitignore)): the `.venv/`, LaTeX build
-products, internal working notes, and the two **reference PDFs** — they are third-party
-publications, cited in [References](#references) rather than redistributed. The compiled
-correspondence [`paper/thz_ml_maxactive.pdf`](paper/thz_ml_maxactive.pdf) **is** tracked,
-alongside its `.tex` source.
+**Not tracked in git** (see [`.gitignore`](.gitignore)): `.venv/`, LaTeX build products,
+internal working notes, template archives, and the two **reference PDFs**. The reference
+PDFs are third-party publications, so they are cited in [References](#references) rather
+than redistributed.
 
 ---
 
 ## The reference model (physics)
 
-A Python port of `TVT_Codes_Matlab/Main_Code.m`, Sections A–I of the notebook.
+A Python port of `TVT_Codes_Matlab/Main_Code.m`, notebook Sections A–I; Section II of the
+paper develops it in full.
 
 | Quantity | Model |
 |---|---|
-| Path loss | Free-space spreading (Friis) + molecular absorption |
-| Absorption | `τ(f) = e^{−k(f)d}`, with `k(f)` from LBLRTM transmittance data |
+| Spreading loss | Friis: `20 log₁₀ d + 20 log₁₀ f[MHz] − 27.55` dB |
+| Absorption | Beer–Lambert transmittance `τ(f,d) = e^{−k(f)d}`, `k(f)` from LBLRTM data |
 | Absorption noise | `P_N = k_B·T₀·(1−τ)·Δf`, `T₀ = 296 K` |
-| Antenna gain | Spherical-lobe model: in-beam `4π/θ_bw²`, else side-lobe `ρ = 0.1`; Tx·Rx product along the instantaneous boresight |
-| SNR / capacity | `γ_i = P_i·G/(A_i·P_{N,i})`,  `C = Σ Δf_i·log₂(1+γ_i)`,  `A_i = 10^{PL_i/10}` |
+| Antenna gain | Spherical-lobe model: in-beam `4π/ψ²`, else side-lobe `ρ = 0.1`; total `G = G_Tx·G_Rx` along the instantaneous line of sight vs fixed boresights |
+| SNR / capacity | `γ_i = P_i·G/(A_i·P_{N,i})`,  `C = Σ_{i∈Ω} Δf_i·log₂(1+γ_i)` |
 | Equal power (EP) | `P_i = P_T/\|Ω\|` |
 | Water-filling (WF) | `P_i = max(0, μ − A_i·P_{N,i}/G)` |
 
-**System parameters:** Tx power 24 dBm; band 0.75–4.4 THz (≈11,700 active channels per
-context); beamwidth 10°; side-lobe level 0.1; Tx fixed, Rx moving over 11 steps. The
-LBLRTM files fix the straight-trajectory distance grid to **[1, 11, 21, …, 101] m**.
+**Problem.** Maximize `C(Ω, {P_i})` over the channel set Ω, the powers, and the beamwidth
+ψ, subject to `Σ P_i ≤ P_T`. The search space is combinatorial (2^|F| subsets).
+Following [1], beamwidth is adjusted first, then selection and power allocation are
+alternated until the channel set is stable (`distance_to_cap_opt()`, Section I).
 
-The absorption data is loaded for the nearest available distance and rescaled to the
-exact link range by the Beer–Lambert law (`load_lblrtm()`, Section C). Selection and
-power allocation are optimized **alternately** in `distance_to_cap_opt()` (Section I):
-an iterative WF ↔ MaxActive convergence loop, with optional beamwidth adjustment
-(`antenna_gain_optim()`, coarse + fine search).
+**System parameters** (from the MATLAB code):
+- Tx power 24 dBm.
+- Band 0.75–4.4 THz: 11,699 channels of ≈0.312 GHz.
+- Beamwidth 10°, side-lobe level 0.1.
+- Horizontal path at 100 m altitude.
+- The LBLRTM files fix the straight-trajectory distance grid to **[1, 11, 21, …, 101] m**.
+  Other ranges are rescaled by the Beer–Lambert law (`load_lblrtm()`, Section C).
 
 ---
 
 ## Mobility patterns
 
 Four patterns, each run for MaxActive-WF and MaxActive-EP, with beamwidth adjustment off
-and on. Capacity spans roughly **nine decades** across them, so every capacity axis is
+and on. Across them capacity spans roughly **nine decades**, so every capacity axis is
 logarithmic.
 
 | # | Pattern | Geometry | Behaviour |
 |---|---|---|---|
 | 1 | **Aligned** | straight trajectory, beams aligned | highest capacity, smooth decay |
-| 2 | **Misaligned, diagonal mobility** | diagonal recession, `v = (√2·5, √2·5)` m/s, fixed beams | capacity collapses as the beams drift apart |
-| 3 | **Misaligned, elevation mobility** | Rx on a constant-radius hemisphere (r = 20 m), φ swept 0°→180° | distance constant — the loss is *purely* misalignment: a sharp drop to a side-lobe plateau (no adjustment) or a gradual decline (with adjustment) |
-| 4 | **Misaligned, real mobility traces** | Tx/Rx integrated from real windy-hover accelerations plus a diagonal drift, t ∈ [0, 5] s | sharp collapse then jitter |
+| 2 | **Misaligned, diagonal mobility** | diagonal recession, `v = (5√2, 5√2, 0)` m/s, fixed beams | capacity collapses as the beams drift apart |
+| 3 | **Misaligned, elevation mobility** | Rx on a constant-radius hemisphere (r = 20 m), zenith angle φ swept 0°→180° | distance constant, so the loss is *purely* misalignment: a sharp drop to a side-lobe plateau (no adjustment) or a gradual decline (with adjustment) |
+| 4 | **Misaligned, real mobility traces** | Tx/Rx integrated from real windy-hover accelerations plus a diagonal drift, t ∈ [0, 5] s | sharp collapse, then jitter |
 
 Patterns 1–2 feed the main 33-sample study (notebook Sections N–S). Patterns 3–4 are
 reproduced for MaxActive in Section M.2 and get their own ML/D3QN treatment on a
 separate 60-sample dataset in Section T.
 
-Patterns 3 and 4 reproduce Figs. 11 and 14 of the source paper in shape. Where the
-MATLAB and the published figure disagree, **the MATLAB is kept** — e.g. the real-trace
-scenario starts at d = 1 m (per the MATLAB initial coordinates), so its t = 0 capacity
-(~29,400 Gbps) is higher than the published figure's.
+Where the MATLAB result and a published figure of [1] disagree, **the MATLAB is kept**.
+For example, the real-trace scenario starts at d = 1 m (per the MATLAB initial
+coordinates), so its t = 0 capacity (~29,400 Gbps) is higher than in the published
+figure.
 
 ---
 
@@ -142,21 +173,27 @@ scenario starts at d = 1 m (per the MATLAB initial coordinates), so its t = 0 ca
 
 | Dataset | Rows | Composition | Notebook |
 |---|---|---|---|
-| Main | **33** | 3 scenarios (aligned, diagonal-noAdj, diagonal-Adj) × 11 distances | Section N |
+| Main | **33** | 3 scenarios (aligned, diagonal no-adj, diagonal adj) × 11 distances | Section N |
 | Mobility | **60** | elevation (2 × 19) + real traces (2 × 11) | Section T |
 
-**Target:** `log₁₀(MaxActive capacity in Gbps)`, fit separately for the WF and EP
-allocations (two regressions, not one feature).
+**Target:** `log₁₀(MaxActive capacity in Gbps)`, fit separately for WF and EP (two
+regressions).
 
-**13 engineered physical features** — the models never see raw channels:
+**13 engineered physical features.** The regressors never see raw channels. The band is
+split into 20 equal sub-bands, and the features are:
+- **Geometry and antenna:** `log₁₀(d+1)` and its square; total gain `G_dB/60` and its
+  square; beamwidth `ψ/360°`.
+- **Channel quality:**
+  - mean and standard deviation over sub-bands of a **received-power indicator**
+    `Π_k = log₁₀(P_T·G/Ā_k)` (labelled `mean_log_SNR`/`std_log_SNR` in the code, but it
+    has no noise term);
+  - mean and standard deviation of the log absorption noise;
+  - normalized mean path loss;
+  - the fraction of non-empty sub-bands.
+- **Context labels:** a scenario index and an allocation flag. The flag is constant per
+  training set, because WF and EP are separate targets.
 
-`log10_dist`, `gain_norm`, `bw_norm`, `scenario_id`, `alloc_flag`, `mean_log_SNR`,
-`std_log_SNR`, `mean_log_noise`, `std_log_noise`, `valid_frac`, `log_dist_sq`,
-`gain_sq`, `mean_PL_norm`.
-
-(`alloc_flag` is effectively constant within a training matrix; WF vs EP is separated by
-training on two targets, not by that feature.) The **D3QN is the exception** — it
-consumes the raw per-channel state.
+The **D3QN is the exception**: it consumes the per-channel state.
 
 ---
 
@@ -169,71 +206,71 @@ Six families, scikit-learn + XGBoost:
 | Linear / regularized | LinearReg (OLS), Ridge, Lasso, ElasticNet, BayesianRidge |
 | Robust | Huber |
 | Kernel / probabilistic | SVR-RBF, KernelRidge, GaussProc (squared-exp + white kernel) |
-| Instance-based | KNN |
+| Instance-based | k-NN |
 | Neural | MLP |
 | Tree ensembles / boosting | RandomForest, ExtraTrees, Bagging, AdaBoost, GradBoost, XGBoost |
 | Single tree (contrast) | DecisionTree |
 
-**HistGradientBoosting was tested and removed** — it fails outright in this data regime
-(CV R² < 0, ceiling overshoot up to ~4×10⁶%).
+**HistGradientBoosting was tested and removed.** It fails in this data regime (negative
+CV R²).
 
-Hyper-parameters are grid-searched. In the authoritative nested CV, every tunable model
-is tuned in an **inner 3-fold loop on the outer training partition only**, so tuning
-never sees the test fold. GaussProc and BayesianRidge self-tune internally
-(marginal likelihood / evidence); LinearReg has nothing to tune.
+**Hyper-parameter tuning.** In the nested CV, every tunable model is grid-searched in an
+**inner 3-fold loop on the outer training partition only**. The grids are listed in
+Table II of the paper. GaussProc and BayesianRidge self-tune (marginal likelihood /
+evidence), and LinearReg has nothing to tune.
+
+A regressor outputs a capacity **value**, not a channel set.
 
 ---
 
 ## The D3QN policy
 
-A dueling double-DQN, deliberately framed as a **single-step contextual bandit, not
-sequential RL**: the channel state is fixed by the geometry, the agent takes one action,
-receives one reward, and the episode ends. Horizon 1, discount 0. One lightweight model
-per (distance, gain) context.
+A dueling double-DQN after [2], framed as a **single-step contextual bandit, not
+sequential RL**. The channel state is fixed by the geometry; the agent takes one action,
+receives one reward, and the episode ends (horizon 1, discount 0, so no target network
+is needed). One lightweight model is trained per (distance, gain) context.
 
 | | |
 |---|---|
-| State | Top-500 SNR-ranked individual channels, each as `[log₁₀ APL, log₁₀ Pn]` → 1000-dim |
-| Network | `1000 → 16 → 8 → [V(1), A(600)]`, dueling head — **21,561 parameters, 84 KB fp32** |
-| Action | Number of selected channels; equal power; the **true physical capacity** of the choice is then evaluated |
-| Reward | `r = ln((C_max − C_min) + 1) − ln((C_max − C) + 1)` |
-| Training | Smooth-ℓ1 loss, ε-greedy, Adam (lr 1e-3, weight decay 1e-4), 20 epochs × 80 actions |
+| State | Top-500 SNR-ranked individual channels, each `[log₁₀ A, log₁₀ P_N]` → 1000-dim |
+| Network | `1000 → 16 → 8 → [V(1), A(600)]`, dueling head: **21,561 parameters, 84 KB fp32** |
+| Action | Number of top-ranked channels to activate (600 actions: 1..50 individually, then 550 evenly spaced). EP; the **true physical capacity** of the choice is evaluated |
+| Reward | `r = ln((C_max − C_min) + 1) − ln((C_max − C) + 1)`, where `C_max` = the context's MaxActive-EP capacity, `C_min = 0`, in bit/s |
+| Training | 20 epochs × 80 ε-greedy actions (ε 1.0 → 0.02); one replay minibatch of 64 per epoch; smooth-ℓ1 loss; Adam (lr 1e-3, weight decay 1e-4); gradient clip 1.0 |
+| Output | The greedy action, **unless an action already evaluated during training gave a higher capacity** (paper eq. 16) |
 
-Because it selects channels and then measures the real capacity of that selection, the
-D3QN is **≤ the MaxActive reference by construction** — unlike the regressors, which
-predict a number and can overshoot.
+Because it selects channels and the real capacity of that selection is then computed, the
+D3QN cannot exceed the best SNR-ordered prefix, unlike the regressors, which predict a
+number and can overshoot.
 
 ---
 
 ## Evaluation protocol
 
-**Optimality scope.** MaxActive is optimal *within its threshold-search family* —
-SNR-ordered nested subsets, conditioned on the given power allocation. It is **not**
-claimed optimal globally over all 2^|F| subsets, nor for the joint selection + power
-problem. The notebook and the paper both state this scope explicitly.
+**Optimality scope.** MaxActive is optimal *within its threshold-search family*
+(SNR-ordered nested subsets), conditioned on the given power allocation. It is **not**
+claimed optimal over all 2^|F| subsets, nor for the joint selection + power problem.
 
-**The physical-optimality clip.** Predictions are capped at `min(pred, MaxActive)` **for
-offline figures only**. The clip needs the reference value, which a deployed surrogate
-does not have, so it is *not* part of the online path. **Every reported metric comes from
-raw, un-clipped predictions**, and the overshoot magnitudes are quantified separately.
+**The display clip.** Plotted regressor curves are capped at `min(pred, MaxActive)` **for
+figures only**. A deployed regressor has no access to the reference, so **every reported
+metric comes from raw, un-clipped predictions**, and the overshoot is reported
+separately.
 
-**Nested cross-validation (Section S) is the authoritative evaluation:** outer
-`RepeatedKFold(5×3) = 15` folds, inner 3-fold grid search, scaling inside the pipeline.
-Run for both the WF and EP targets. 33 points cannot support a single ~8-point test set
-for ranking 18 models — one split reshuffles the rankings and hides overfitting (Huber
-looks best on one split but collapses to R² 0.93 under CV; OLS looks fine but is
-R² −7.98). The single 75/25 split in Section Q is retained only for the illustrative
-curve fits; **cite the nested-CV numbers.**
+**Nested cross-validation (Section S) is the authoritative evaluation.**
+- Outer `RepeatedKFold(5×3) = 15` folds; inner 3-fold grid search; scaling inside the
+  pipeline.
+- Run for both the WF and EP targets.
+- Why not a single split: 33 points cannot support one ~8-point test set for ranking 18
+  models. On a single 75/25 split, Huber is second only to GaussProc but falls to R² 0.93
+  under CV; OLS looks fine (R² 0.991) but scores R² −7.98 under CV.
+- The single split (Section Q) is kept only for illustration. **Cite the nested-CV
+  numbers.**
 
-**Robust metric:** median relative error in linear Gbps alongside RMSE/R² on the log
-target — MAPE explodes on the tiny far-distance capacities.
-
-**Display vs metric:** figure curves are refit on all data (`predict_curve_full`, i.e.
-the deployable estimator); reported metrics come from nested CV.
+**Robust metric:** median relative error in linear Gbps, alongside RMSE and R² on the log
+target. MAPE explodes on the tiny far-distance capacities.
 
 **Smoothing:** every capacity curve uses PCHIP (monotone) interpolation **in log space**,
-with a marker at each truly computed point. It is display-only and fabricates nothing —
-the real-trace jitter is preserved deliberately.
+with a marker at each computed point. It is display-only.
 
 ---
 
@@ -241,112 +278,126 @@ the real-trace jitter is preserved deliberately.
 
 ### Reference reproduction
 
-All four mobility patterns reproduce with the expected ordering and a ~9-decade span;
-the elevation and real-trace curves match the source paper's Figs. 11 and 14 in shape.
+All four mobility patterns reproduce with the expected ordering (aligned > adjusted >
+non-adjusted) and a ~9-decade span. WF and EP capacities nearly coincide.
 
 ### Supervised models (nested CV, EP target)
 
 | Tier | Models | Notes |
 |---|---|---|
-| **Best** | **GaussProc** (R² ≈ 0.99, median rel. err. ≈ **1.9%**), ExtraTrees (0.986, 12.1%), SVR-RBF (0.982, 7.8%), MLP (0.980), then KNN, XGBoost | smoothness-assuming models win |
+| **Best** | **GaussProc** (R² ≈ 0.99, median rel. err. ≈ **1.9%**), ExtraTrees (0.986, 12.1%), SVR-RBF (0.982, 7.8%), MLP (0.980), then k-NN, XGBoost | smoothness-assuming models win |
 | Middle | Ridge, Lasso, ElasticNet, BayesianRidge | stable R² ≈ 0.97 but biased, ~45% median rel. err. |
 | **Failures** | DecisionTree, GradBoost (ceiling overshoot ~3000–3700%), Huber (CV-unstable, R² 0.93), **LinearReg worst at CV R² ≈ −7.98** | |
 
-**WF vs EP agree.** Nested CV was run for both targets; RMSE differs by **≤ 0.055 across
-all 18 models** (≤ 0.02 for all but DecisionTree), consistent with WF ≈ EP capacity at
-THz. The paper therefore tabulates EP only, and says so.
+**Every regressor exceeds the physical bound at one or more points.** How large that
+violation is matters as much as the average error; see Table IV of the paper.
+
+**WF and EP agree.** Nested CV was run for both targets; RMSE differs by **≤ 0.055 across
+all 18 models**. The paper therefore tabulates EP only.
 
 **Mobility dataset (elevation + real traces):** XGBoost 0.07%, GradBoost 0.7%,
-GaussProc 2.8%, Huber 4.4% median relative error. ⚠️ This is an **in-sample** fit — it
-flatters GradBoost, which fails under CV. Always qualify it when quoting.
+GaussProc 2.8%, Huber 4.4% median relative error. ⚠️ This is an **in-sample** fit: it
+flatters GradBoost, which fails under CV.
 
 ### D3QN
 
-Reproduces MaxActive-EP to within ~0.1% **on the mean ratio** for all seven scenario
-variants (aligned 99.9%, the six misaligned 100.0%). The **worst single operating point
-is 99.7%**, out of 93 geometries (33 main + 60 mobility); it never exceeds the ceiling.
-Quote the mean and the worst point separately — an unqualified "within 0.1% everywhere"
-is wrong at the per-point level.
+The D3QN reaches **≥ 99.7% of MaxActive-EP at every one of the 93 geometries** (33 main
++ 60 mobility):
+- mean ratio 99.9% in the aligned case and 100.0% in the six misaligned cases;
+- it never exceeds the reference.
+
+How to read these numbers:
+- The chosen channel counts can differ from MaxActive's by up to 30 channels, at
+  near-equal capacity.
+- The reward uses the reference capacity.
+- The reported decision includes the training-time fallback (output rule above).
+
+So the figures describe the full training-plus-selection procedure, not the greedy
+network alone.
 
 ### The methodological takeaway
 
-On smooth, wide-dynamic-range, small-sample data, smoothness-assuming models win, and
-generalization must be judged by nested CV rather than a single split. The best models
-(GaussProc, kernel methods) also carry the highest asymptotic complexity — which does
-not bind at this sample size.
+- On smooth, wide-dynamic-range, small-sample data, smoothness-assuming models win.
+- Generalization must be judged by nested CV, not a single split.
+- Learning the *decision* is safer than learning its *value*: a policy reports only
+  capacities a real allocation delivers.
 
 ---
 
 ## Runtime, memory, and deployment
 
-Measured in notebook Section U on an i7-13620H, 1 core, |F| ≈ 11,700 channels/context,
-from the committed 2026-08-09 run. The benchmark isolates the *decision* cost given a
-shared channel state.
+Measured in notebook Section U on an i7-13620H, 1 core, |F| ≈ 11,700 channels per
+context, from the committed run.
 
 | Path | Cost |
 |---|---|
 | MaxActive threshold sweep | **77 ms** |
-| Full link update | 95 ms (11 aligned contexts); on the 3 contexts where both were timed, adding the beamwidth search gives 72 → 91 ms, i.e. 1.3× |
-| Surrogate: feature extraction | 0.84 ms |
-| Surrogate: inference | 21–43 µs |
-| **Surrogate end-to-end** | **0.9 ms (~88×)** |
-| D3QN | shared SNR ranking 0.55 ms + forward pass 0.05 ms; 0.11 s training per context |
+| Full link update | 95 ms (11 aligned contexts). On the 3 contexts where both were timed, adding the beamwidth search raises it from 72 to 91 ms (1.3×) |
+| Regressor: feature extraction | 0.84 ms |
+| Regressor: inference | 21–43 µs |
+| **Regressor end-to-end** | **0.9 ms (~88×)** |
+| D3QN | shared SNR ranking 0.55 ms + forward pass 0.05 ms; **0.11 s training per context** |
 
-The model evaluation alone is 1800–3700× faster than the sweep, so **feature extraction,
-not inference, now dominates** the surrogate path — that is the next optimization target.
-Tree ensembles are the exception (3.0–12 ms/predict → only 6–20×).
+- **Feature extraction, not inference, dominates** the regressor path: the model
+  evaluation alone is 1800–3700× faster than the sweep.
+- Tree ensembles are the exception: 3.0–12 ms per prediction, so only 6–20× faster.
+- Training one D3QN context costs more than one sweep and needs that context's reference
+  capacity. The D3QN therefore saves computation only for contexts that recur.
 
-> ⚠️ **Timings are the only non-reproducible numbers here and they vary several-fold with
-> machine load** — the same sweep has measured 77–81 ms (idle), 118–134 ms (lightly
-> loaded) and 623 ms (contended) across runs of identical code. Memory footprints, parameter counts and every accuracy metric are
-> bit-identical across runs. Benchmark on an idle machine before quoting these.
+> ⚠️ **Timings are the only non-reproducible numbers, and they vary several-fold with
+> machine load.** The same sweep has measured 77–81 ms (idle), 118–134 ms (lightly
+> loaded) and 623 ms (contended). Memory footprints, parameter counts and every accuracy
+> metric are bit-identical across runs.
 
 **Memory:** linear 1.2–2.2 KB · SVR 4.6 KB · GaussProc 17.9 KB · MLP 70 KB ·
-D3QN 84 KB (21 KB at 8-bit) · XGBoost 522 KB · ExtraTrees 1.4 MB.
+D3QN 84 KB · XGBoost 522 KB · ExtraTrees 1.4 MB.
 
 **Asymptotics:** MaxActive `O(Q·|F|)` per step, no training. Linear `O(nd²)` train /
 `O(d)` predict; trees `O(T·nd·log n)` / `O(T·depth)`; kernel/GP `O(n²–n³)` train with
 `O(n²)` memory.
 
-**Recommendation:** GaussProc where accuracy dominates; D3QN where the selection *mask*
-is needed; tree ensembles offline only. At n ≤ 60 the asymptotic penalty is invisible
-(GaussProc trains in 14 ms) so pick the most accurate — as n grows toward 10⁴–10⁶ the
-cubic kernel cost binds and tree ensembles take over. *Kernel methods while the dataset
-is small, tree ensembles once it is not.*
+**Recommendation:**
+- GaussProc where accuracy dominates.
+- D3QN where the channel set is needed (subject to per-context training).
+- Tree ensembles offline only.
+
+At n ≤ 60 the asymptotic penalty is invisible (GaussProc trains in 14 ms). *Kernel
+methods while the dataset is small, tree ensembles once it is not.*
 
 ---
 
 ## Figures
 
-All 17 figures are regenerated by a full notebook run. Three are used by the paper and
-are authored at their **final printed size** (IEEE textwidth 7.16 in) with journal-scale
-fonts — see [Gotchas](#gotchas-for-anyone-extending-this).
+The notebook regenerates all 17 PNG figures in the repository root.
 
-### Paper figures
+### Paper figures (`paper_taes/figures/`)
 
-**`all_methods_comparison.png`** — one representative per model family (Ridge, Huber,
-k-NN, MLP, GaussProc, ExtraTrees) plus D3QN against MaxActive, over the aligned and
-diagonal scenarios × WF/EP, evaluated at the ceiling. The full 18-model comparison is
-tabulated rather than plotted, which keeps the panels legible.
+- **Fig. 1, `maxactive_reference_single.png`:** the MaxActive reference. Three scenarios
+  on one log axis; WF thick and coloured, with EP dashed on top. Byte-identical to the
+  notebook output.
+- **Fig. 2, `fig_capacity_main.pdf`:** one representative per regressor family (Ridge,
+  Huber, k-NN, MLP, GaussProc, ExtraTrees) plus the D3QN against MaxActive, over the
+  aligned and diagonal scenarios, for WF and EP.
+- **Fig. 3, `fig_capacity_mobility.pdf`:** the same representatives on the elevation and
+  real-trace patterns, EP only.
 
-![All methods vs MaxActive](all_methods_comparison.png)
+**How Figs. 2 and 3 were made.** They are presentation-only re-plots, at printed size
+(4.9 in, 8–8.5 pt text), of `fig_data.npz`. That file holds the exact arrays plotted by
+notebook cells `4818a43f` and `t0comb01`. It was dumped from a copy of the notebook whose
+outputs matched the committed notebook cell for cell, and whose regenerated PNGs were
+pixel-identical. To restyle, edit `replot_paper_figures.py` and run it; it never trains,
+simulates, or evaluates anything.
 
-**`maxactive_reference_single.png`** — the MaxActive reference: three scenarios on one
-log axis (they occupy disjoint decades), WF in thick colour with the EP overlay dashed.
+![Fig. 2: learned models vs MaxActive](paper_taes/figures/fig_capacity_main.png)
 
-![MaxActive reference](maxactive_reference_single.png)
+![Fig. 3: additional mobility patterns](paper_taes/figures/fig_capacity_mobility.png)
 
-**`ml_mobility_comparison.png`** — elevation and real-trace mobility, EP only (WF is
-omitted because it coincides with EP). Same family representatives as Fig. 1.
+### Notebook-only figures (repository root)
 
-![ML on the additional mobility patterns](ml_mobility_comparison.png)
-
-### Notebook-only figures
-
-`maxactive_capacity_3panel.png` (older 3-panel reference) · `maxactive_elevation.png` ·
+`all_methods_comparison.png` and `ml_mobility_comparison.png` (the earlier versions of
+Figs. 2–3) · `maxactive_capacity_3panel.png` · `maxactive_elevation.png` ·
 `maxactive_real_traces.png` · `ml_elevation_comparison.png` · `ml_real_comparison.png` ·
-`cv_rmse_ranking.png` (nested-CV RMSE ranking with error bars) · `learning_curves.png`
-(data efficiency by family; computed but unused) · `d3qn_v4_comparison.png` ·
+`cv_rmse_ranking.png` · `learning_curves.png` · `d3qn_v4_comparison.png` ·
 `d3qn_v4_ratio_and_channels.png` · `d3qn_v4_capacity_gap.png` ·
 `d3qn_v4_scatter_heatmap.png` · `ml_metrics_comparison.png` · `ml_scatter_WF.png` ·
 `feature_importance.png`.
@@ -360,24 +411,24 @@ omitted because it coincides with EP). Same family representatives as Fig. 1.
 | Section | Contents |
 |---|---|
 | **A** | Imports/setup; `MAT_DIR` → `TVT_Codes_Matlab/` |
-| **A.1** | `slog()`, `_smooth_log()`, `_mk_ls()` — PCHIP log-space smoothing used by every curve figure |
+| **A.1** | `slog()`, `_smooth_log()`, `_mk_ls()`: PCHIP log-space smoothing used by every curve figure |
 | **B** | System parameters |
-| **C** | `load_lblrtm()` — transmittance loading + Beer–Lambert rescaling (cached) |
+| **C** | `load_lblrtm()`: transmittance loading + Beer–Lambert rescaling (cached) |
 | **D** | dB helpers, `coord2theta_phi`, `acute_angle`, `boresight_calc`, `AEmodel`, `total_antenna_gain_dB`, `delta_freq_hz`, `noise_power` |
-| **E** | `mask_cap()` — Shannon capacity over the active set |
+| **E** | `mask_cap()`: Shannon capacity over the active set |
 | **F** | `water_filling_algo()` |
-| **G** | `active_freq_mask()` — **MaxActive** |
-| **H** | `antenna_gain_optim()` — beamwidth optimization |
-| **I** | `distance_to_cap_opt()` — master per-context function, WF ↔ MaxActive loop |
+| **G** | `active_freq_mask()`: **MaxActive** |
+| **H** | `antenna_gain_optim()`: beamwidth optimization |
+| **I** | `distance_to_cap_opt()`: master per-context function, WF ↔ MaxActive loop |
 | **J–K** | Trajectory setup and the 3 base scenarios × 2 allocations |
 | **L** | Both reference figures |
 | **M** | Validation asserts + the capacity summary table |
-| **M.2** | `a2vd()`, `make_elevation_traj()`, `make_real_traj()`, `run_traj_maxactive()` — the elevation and real-trace patterns (MaxActive only) |
+| **M.2** | `a2vd()`, `make_elevation_traj()`, `make_real_traj()`, `run_traj_maxactive()`: the elevation and real-trace patterns (MaxActive only) |
 | **N** | 33-sample dataset, `build_subband_state_v2()`, `build_features_v2()` |
 | **O / O.2** | D3QN training and diagnostics |
-| **P** | Supervised ML — 8 models + an extended cell adding 11 more → 18 |
+| **P** | Supervised ML: 8 models + an extended cell adding 11 more → 18 |
 | **Q** | Single-split training, all-methods figure, metrics, scatter, feature importances |
-| **S** | **Nested cross-validation — the authoritative metrics** (`CV_MODELS`, `_make_cv_est()`) |
+| **S** | **Nested cross-validation, the authoritative metrics** (`CV_MODELS`, `_make_cv_est()`) |
 | **R** | Clip explanation, overshoot analysis, per-model rationale |
 | **T** | The same 18 models + D3QN on the 60-sample mobility dataset |
 | **U** | Runtime and memory benchmark → `runtime_bench` |
@@ -417,71 +468,78 @@ Execute the whole pipeline and regenerate every figure:
 python -m nbconvert --to notebook --execute --inplace thz_d3qn_v4.ipynb
 ```
 
-**~6 minutes wall clock** on an idle machine. Measured sub-steps: the three base
-scenarios × 2 allocations ≈ 7 s, D3QN training over 33 contexts 6.2 s, nested CV
-29.7 s. The bulk of the time is
-the beamwidth-optimizing physics sweeps in Sections M.2/T (60 mobility contexts, each
-running `antenna_gain_optim`) plus the Section U benchmark.
-
-Everything is deterministic under fixed seeds **except** the Section U wall-clock
-timings, which move ±10% with machine load. The committed notebook is a clean in-order
-run (execution counts 1→55, zero errors).
+- **Run time:** about 6 minutes wall clock on an idle machine. Most of it is the
+  beamwidth-optimizing physics sweeps in Sections M.2/T, plus the Section U benchmark.
+- **Determinism:** everything is deterministic under fixed seeds **except** the
+  Section U wall-clock timings.
+- **The committed notebook** is a clean in-order run with zero errors.
 
 ---
 
 ## Building the paper
 
 ```bash
-cd paper
-pdflatex thz_ml_maxactive.tex   # run twice; latexmk is unavailable on the dev machine
-pdflatex thz_ml_maxactive.tex
+cd paper_taes
+pdflatex thz_ml_spectrum_allocation
+bibtex   thz_ml_spectrum_allocation
+pdflatex thz_ml_spectrum_allocation
+pdflatex thz_ml_spectrum_allocation
 ```
 
-The compiled PDF is tracked, so rebuild only when the `.tex` or a figure changes, and
-commit the regenerated PDF with it. The source compiles with **IEEEtran** (the IEEEtaes class
-was unavailable offline, but the body maps 1:1 to the TAES template). It has nine
-sections, 3 figures and 5 tables: key formulas, MaxActive capacities, the nested-CV
-ranking with ceiling violations merged in, per-scenario error, and asymptotic + measured
-complexity.
+The manuscript uses the official **IEEE TAES Correspondence** template
+(`\documentclass[correspondence]{IEEEtaes}`; the class and `.bst` files are unmodified).
+**The empty left column on page 1 belongs to the template.** The paper has six
+sections:
+1. Introduction (with related work and contributions)
+2. System Model and Background
+3. Alternative Machine Learning Solutions
+4. Performance Analysis
+5. Convergence and Complexity
+6. Conclusions
 
-Every number in the paper traces to a notebook cell — audited value by value. The only
-non-deterministic values are the Section U timings, which live in **preamble macros**
-(`\PLNCH`, `\PLMASEL`, `\PLMASTEP`, `\PLMASTEPBW`, `\PLPREDUS`) so a re-run needs one
-edit in one place. Those macros already contain `$...$`: write `\PLMASEL{}`, **never**
-`$\PLMASEL$`.
+It has 3 figures and 6 tables.
 
-Other LaTeX traps, in case you edit it:
+Every number in the results and complexity tables traces to a notebook cell. The only
+non-deterministic values are the Section U timings, held in **preamble macros**
+(`\PLNCH`, `\PLMASEL`, `\PLMASTEP`, `\PLMASTEPBW`, `\PLPREDUS`). Those macros already
+contain `$...$`: write `\PLMASEL{}`, **never** `$\PLMASEL$`. Some timings in Section V
+are hard-coded, so re-sync them too after any re-run.
 
-- Page numbers are bottom-right via `fancyhdr`; the title page needs
-  `\thispagestyle{plain}` right after `\maketitle`, because `\maketitle` installs
-  IEEEtran's own `IEEEtitlepagestyle`.
-- `placeins` is loaded but `\FloatBarrier` is deliberately **not** used — it hurt
-  packing. Float placement is tuned via `\dbltopfraction`, `\dblfloatpagefraction`, and
-  `dbltopnumber` instead; without those the double-column figures get banished to sparse
-  float pages.
-- Table III is `\scriptsize` with `\tabcolsep` 2.5 pt. At `\footnotesize` it overflows
-  the column by ~27 pt and bleeds into the neighbour. After editing any table, grep the
-  log for `Overfull \hbox`.
-- The page count is float-sensitive.
+LaTeX traps in this template:
+- The class stores `\affil` with `\edef`, so write accents as `\noexpand\"u`.
+- `IEEEtaes.bst` ignores the `doi` field, so DOIs go in `note`.
+- Subsection references print as "III-D" via
+  `\renewcommand{\p@subsection}{\thesection-}`.
+- After editing any table, grep the log for `Overfull \hbox`.
+
+The change log of the October 2026 revision and the issues awaiting supervisor review
+are in [`paper_taes/REVISION_NOTES.md`](paper_taes/REVISION_NOTES.md).
 
 ---
 
-## Scope and limitations
+## Scope, limitations, and open items
 
 Intentionally **not** implemented:
 
-- The **CFB and STD** channel-selection variants — MaxActive only.
-- A **single distance-generalizing D3QN policy** — the agents here are per-context bandits.
-- ML prediction of the **selection mask** — only the capacity value is regressed. (The
-  D3QN does produce a selection.)
-- **Larger or more diverse datasets** — fixed at 33 + 60 points. The elevation and
-  real-trace patterns are kept as a separate 60-sample dataset rather than merged into
-  the main study.
+- The **CFB and STD** channel-selection variants (MaxActive only).
+- A **single geometry-generalizing D3QN policy**: the agents here are per-context bandits.
+- Regressor prediction of the **channel set**: only the capacity value is regressed. The
+  D3QN does produce a selection.
+- **Larger or more diverse datasets**: fixed at 33 + 60 points.
 
-The honest caveats: the datasets are small by ML standards (which is why nested CV, not
-a single split, decides every ranking); the mobility-dataset numbers quoted above are
-in-sample; and the D3QN result demonstrates that a learned policy can recover a
-single-step decision, not that deep RL solved a hard sequential problem.
+Honest caveats:
+- The datasets are small and physically smooth. The regressors are validated as
+  *interpolators* within the trained envelope.
+- The mobility-dataset numbers are in-sample.
+- The D3QN result reflects the full training-plus-selection procedure, with the reference
+  capacity in the reward.
+- All timings come from a laptop-class CPU.
+
+Open items awaiting a decision are listed in
+[`paper_taes/REVISION_NOTES.md`](paper_taes/REVISION_NOTES.md). The main ones:
+- whether to run a greedy-only D3QN evaluation (a new experiment);
+- the TAES overlength charges beyond 6 printed pages;
+- the mandatory AI-use disclosure.
 
 ---
 
@@ -489,42 +547,50 @@ single-step decision, not that deep RL solved a hard sequential problem.
 
 - **`t0data01` rebinds the global boresight variables** `tTxBS, pTxBS, tRxBS, pRxBS` to
   the last mobility scenario. Any later cell needing the aligned/diagonal geometry must
-  recompute it with `boresight_calc(CoordTx_init, CoordRx_init)` — Section U does.
-- **Paper figures must be authored at printed size** (7.16 in textwidth; labels 12 pt,
-  ticks 10.5 pt, legend 9.2 pt — the single-column reference figure uses 19/16/14.5 pt
-  because it prints at half width). Authoring at a 15-in figsize shrinks the fonts ~4×
-  on inclusion, rendering them at ~3.5 pt.
+  recompute it with `boresight_calc(CoordTx_init, CoordRx_init)`; Section U does this.
+- **Paper figures must be authored at printed size.** Authoring at a large figsize
+  shrinks the fonts several-fold on inclusion. Check that no ink touches a PNG edge.
+- **Do not re-run the notebook in place just to restyle a figure.** Use
+  `paper_taes/figures/replot_paper_figures.py`.
 - **Elevation r = 20 m** and the **diagonal real-trace drift** come from the MATLAB
   configuration (`GenHemSphCoord`; `StraightDiagonalFlag = 1`), not from the paper.
-- **Timing numbers are not deterministic** — re-sync the five `\PL*` macros after any
-  re-run.
+- **Timing numbers are not deterministic.** Re-sync the `\PL*` macros and the hard-coded
+  Section V timings after any re-run.
 - **PCHIP smoothing is display-only**; the markers show the true computed points.
-- The Section R markdown heading still reads "(20 models)"; the current count is **18**
-  (HistGB removed).
+- The Section R markdown heading still reads "(20 models)"; the current count is **18**.
 
 ---
 
 ## References
 
-Neither PDF is redistributed in this repository.
+Neither reference PDF is redistributed in this repository. The full verified bibliography
+is in [`paper_taes/references.bib`](paper_taes/references.bib).
 
-1. *Joint Resource Allocation for Terahertz Band Drone Communications* (June 2024) — the
-   source paper. Its Figs. 11 and 14 correspond to the elevation and real-trace mobility
-   patterns reproduced here.
-2. The D3QN reference paper informing the dueling double-DQN design.
-3. LBLRTM — Line-By-Line Radiative Transfer Model, the origin of the molecular
-   transmittance data in `TVT_Codes_Matlab/`.
+1. A. Saeed, M. Erdem, A. Saleem, O. Gurbuz, and M. A. Akkas, "Joint resource allocation
+   for terahertz band drone communications," *IEEE Trans. Veh. Technol.*, vol. 73, no. 6,
+   pp. 8281–8294, Jun. 2024, doi: 10.1109/TVT.2024.3354067. The MaxActive source paper,
+   and the origin of the MATLAB model.
+2. K. B. Elçik, A. Saeed, Ö. Gürbüz, and Ç. Tunç, "Spectrum allocation via deep
+   Q-learning for 6G terahertz band drone communications," in *Proc. 33rd SIU*, 2025,
+   doi: 10.1109/SIU66497.2025.11112483. The prior D3QN channel-selection work.
+3. S. A. Clough *et al.*, "Atmospheric radiative transfer modeling: A summary of the AER
+   codes," *J. Quant. Spectrosc. Radiat. Transfer*, vol. 91, no. 2, pp. 233–244, 2005.
+   LBLRTM, the origin of the molecular transmittance data.
 
 ---
 
 ## Citation and authors
 
-- **Korhan Erdoğdu** — main contributor, Sabancı University
-- **Özgür Gürbüz** — Professor, Sabancı University (supervised)
-- **Akhtar Saeed** — Assistant Professor, Kadir Has University (supervised)
-- **Mikail Erdem** — Postdoctoral Researcher and Instructor, Sabancı University
+- **Korhan Erdoğdu**, main contributor, Sabancı University
+- **Özgür Gürbüz**, Professor, Sabancı University (supervised)
+- **Akhtar Saeed**, Assistant Professor, Kadir Has University (supervised)
+- **Mikail Erdem**, Postdoctoral Researcher and Instructor, Sabancı University
 
-*Machine-Learning Surrogates for MaxActive Channel Selection in Terahertz Drone-to-Drone
-Communications*, IEEE correspondence — source in
-[`paper/thz_ml_maxactive.tex`](paper/thz_ml_maxactive.tex), compiled PDF in
-[`paper/thz_ml_maxactive.pdf`](paper/thz_ml_maxactive.pdf).
+*Machine Learning Based Spectrum Allocation for THz UAV Communications*, manuscript in
+preparation for IEEE Transactions on Aerospace and Electronic Systems (Correspondence).
+Source: [`paper_taes/thz_ml_spectrum_allocation.tex`](paper_taes/thz_ml_spectrum_allocation.tex);
+compiled PDF:
+[`paper_taes/thz_ml_spectrum_allocation.pdf`](paper_taes/thz_ml_spectrum_allocation.pdf).
+
+This work was supported by the Scientific and Technological Research Council of Türkiye
+(TÜBİTAK) under Grant No. 224N014.

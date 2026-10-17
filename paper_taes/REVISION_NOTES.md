@@ -3,7 +3,7 @@
 Revised manuscript: `paper_taes/thz_ml_spectrum_allocation.tex` → `thz_ml_spectrum_allocation.pdf` (15 pages).
 Bibliography: `paper_taes/references.bib` (BibTeX, `IEEEtaes.bst`).
 Template: `IEEEtaes.cls` / `IEEEtaes.bst`, copied unmodified from `IEEE_TAES_correspondence.zip` inside `TAES+Template.zip`, class option `correspondence`.
-The original paper (`paper/`) is untouched. Branch: `paper-revision-taes-oct2026` (nothing committed).
+The superseded IEEEtran paper (`paper/`) was removed from the repository after this revision was merged into `main`; it remains in git history (commit `1286300`). Fig. 1 is now `figures/maxactive_reference_single.png`, a byte-identical copy of the notebook output.
 
 Build: `cd paper_taes && pdflatex thz_ml_spectrum_allocation && bibtex thz_ml_spectrum_allocation && pdflatex … && pdflatex …`
 Result: 0 errors, 0 overfull boxes, 0 undefined references or citations.
