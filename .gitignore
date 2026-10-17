@@ -31,6 +31,10 @@ dist/
 # ---------------------------------------------------------------------------
 *.pdf
 !paper/thz_ml_maxactive.pdf
+# TAES Correspondence revision (Oct 2026): the compiled manuscript and the vector
+# figures it includes are ours and are tracked.
+!paper_taes/thz_ml_spectrum_allocation.pdf
+!paper_taes/figures/*.pdf
 
 # ---------------------------------------------------------------------------
 # LaTeX build products (the .tex source is tracked)
@@ -58,6 +62,12 @@ z.txt
 CLAUDE.md
 claude.md
 .claude/
+
+# Supervisor-meeting revision instructions (private) and the third-party IEEE
+# template archive (its class/bst files are already copied into paper_taes/)
+CLAUDE_updated.md
+TAES+Template.zip
+*.zip
 
 # ---------------------------------------------------------------------------
 # OS and editor cruft
