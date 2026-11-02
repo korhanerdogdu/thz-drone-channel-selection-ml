@@ -28,10 +28,14 @@ dist/
 #   * paper_taes/thz_ml_spectrum_allocation.pdf is OUR paper (TAES Correspondence)
 #     and is tracked, together with the vector figures it includes (negated below).
 #     (The superseded IEEEtran version in paper/ was removed in Oct 2026.)
+#   * paper_ojvt/ojvt.pdf is the CURRENT paper (IEEE OJVT, Nov 2026), tracked
+#     with its figure PDFs for the same reason.
 # ---------------------------------------------------------------------------
 *.pdf
 !paper_taes/thz_ml_spectrum_allocation.pdf
 !paper_taes/figures/*.pdf
+!paper_ojvt/ojvt.pdf
+!paper_ojvt/figures/*.pdf
 
 # ---------------------------------------------------------------------------
 # LaTeX build products (the .tex source is tracked)
