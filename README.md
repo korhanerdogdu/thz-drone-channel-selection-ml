@@ -19,9 +19,9 @@ trajectory geometry, and the physics. **No value is read off a published figure.
 
 - **Code and results:** a single executable notebook,
   [`thz_d3qn_v4.ipynb`](thz_d3qn_v4.ipynb) (90 cells, Sections A–U).
-- **Paper:** an IEEE Transactions on Aerospace and Electronic Systems (TAES)
-  Correspondence manuscript in [`paper_taes/`](paper_taes/), with the compiled
-  [`thz_ml_spectrum_allocation.pdf`](paper_taes/thz_ml_spectrum_allocation.pdf).
+- **Paper:** a manuscript for the IEEE Open Journal of Vehicular Technology (OJVT) in
+  [`paper_ojvt/`](paper_ojvt/), with the compiled [`ojvt.pdf`](paper_ojvt/ojvt.pdf).
+  The earlier TAES Correspondence version is kept in [`paper_taes/`](paper_taes/).
 
 ---
 
@@ -85,13 +85,20 @@ TVT_Codes_Matlab/                # reference MATLAB model + all input data
   data_small_windy_average.mat   #   real windy-hover acceleration traces (USED)
   ITU_dist_*.mat, d*m*.mat       #   auxiliary MATLAB data (see note below)
 
-paper_taes/                      # the paper — IEEE TAES Correspondence (15 pages)
+paper_ojvt/                      # THE paper — IEEE OJVT manuscript (14 pages)
+  ojvt.tex                       #   LaTeX source
+  ojvt.pdf                       #   compiled manuscript
+  References.bib                 #   28 verified BibTeX references (DOI or URL for each)
+  ieee-ojvt.cls, ojvt-logo.png   #   official OJVT template files (unmodified)
+  figures/                       #   copies of the three paper figures below
+
+paper_taes/                      # previous version — IEEE TAES Correspondence (15 pages)
   thz_ml_spectrum_allocation.tex #   LaTeX source
   thz_ml_spectrum_allocation.pdf #   compiled manuscript
-  references.bib                 #   28 verified references (DOIs where registered)
+  references.bib                 #   bibliography of the TAES version
   IEEEtaes.cls, IEEEtaes.bst     #   official TAES template files (unmodified)
   REVISION_NOTES.md              #   change log and open issues of the Oct 2026 revision
-  figures/
+  figures/                       #   source of the paper figures (re-plot script + data)
     maxactive_reference_single.png   # Fig. 1 (notebook output, unchanged)
     fig_capacity_main.pdf/.png       # Fig. 2
     fig_capacity_mobility.pdf/.png   # Fig. 3
@@ -370,7 +377,7 @@ methods while the dataset is small, tree ensembles once it is not.*
 
 The notebook regenerates all 17 PNG figures in the repository root.
 
-### Paper figures (`paper_taes/figures/`)
+### Paper figures (`paper_taes/figures/`, copied unchanged to `paper_ojvt/figures/`)
 
 - **Fig. 1, `maxactive_reference_single.png`:** the MaxActive reference. Three scenarios
   on one log axis; WF thick and coloured, with EP dashed on top. Byte-identical to the
@@ -386,7 +393,8 @@ The notebook regenerates all 17 PNG figures in the repository root.
 notebook cells `4818a43f` and `t0comb01`. It was dumped from a copy of the notebook whose
 outputs matched the committed notebook cell for cell, and whose regenerated PNGs were
 pixel-identical. To restyle, edit `replot_paper_figures.py` and run it; it never trains,
-simulates, or evaluates anything.
+simulates, or evaluates anything. After a re-plot, copy the new PDFs into
+`paper_ojvt/figures/`.
 
 ![Fig. 2: learned models vs MaxActive](paper_taes/figures/fig_capacity_main.png)
 
@@ -479,41 +487,51 @@ python -m nbconvert --to notebook --execute --inplace thz_d3qn_v4.ipynb
 ## Building the paper
 
 ```bash
-cd paper_taes
-pdflatex thz_ml_spectrum_allocation
-bibtex   thz_ml_spectrum_allocation
-pdflatex thz_ml_spectrum_allocation
-pdflatex thz_ml_spectrum_allocation
+cd paper_ojvt
+pdflatex ojvt
+bibtex   ojvt
+pdflatex ojvt
+pdflatex ojvt
 ```
 
-The manuscript uses the official **IEEE TAES Correspondence** template
-(`\documentclass[correspondence]{IEEEtaes}`; the class and `.bst` files are unmodified).
-**The empty left column on page 1 belongs to the template.** The paper has six
-sections:
-1. Introduction (with related work and contributions)
-2. System Model and Background
-3. Alternative Machine Learning Solutions
-4. Performance Analysis
-5. Convergence and Complexity
-6. Conclusions
+The manuscript uses the official **IEEE OJVT** template (`\documentclass{ieee-ojvt}`;
+the class file and logo are unmodified). The paper has eight sections:
+1. Introduction
+2. Related Work
+3. Research Gap and Contributions
+4. System Model and Background
+5. Alternative Machine Learning Solutions
+6. Performance Analysis
+7. Convergence and Complexity
+8. Conclusion
 
-It has 3 figures and 6 tables.
+It has 3 figures and 6 tables, followed by the acknowledgment, which includes the AI-use
+statement.
+
+**References are BibTeX only.** All 28 entries are in `References.bib`, and the
+document ends with `\bibliographystyle{IEEEtran}` and `\bibliography{References}`.
+- The first entry, the MaxActive paper (key `10399804`), was supplied by the supervisors
+  and is kept verbatim.
+- Every other entry was checked against Crossref, the publisher page or the authors'
+  PDF, including the full author list. Each has a working DOI or URL.
+- Page ranges are left out only where the publisher lists none (NIPS 2007, AAAI-16).
 
 Every number in the results and complexity tables traces to a notebook cell. The only
 non-deterministic values are the Section U timings, held in **preamble macros**
 (`\PLNCH`, `\PLMASEL`, `\PLMASTEP`, `\PLMASTEPBW`, `\PLPREDUS`). Those macros already
-contain `$...$`: write `\PLMASEL{}`, **never** `$\PLMASEL$`. Some timings in Section V
+contain `$...$`: write `\PLMASEL{}`, **never** `$\PLMASEL$`. Some timings in Section VII
 are hard-coded, so re-sync them too after any re-run.
 
-LaTeX traps in this template:
-- The class stores `\affil` with `\edef`, so write accents as `\noexpand\"u`.
-- `IEEEtaes.bst` ignores the `doi` field, so DOIs go in `note`.
-- Subsection references print as "III-D" via
-  `\renewcommand{\p@subsection}{\thesection-}`.
-- After editing any table, grep the log for `Overfull \hbox`.
+LaTeX notes:
+- `IEEEtran.bst` ignores the `doi` field, so DOIs go in `note`, as
+  `\href{https://doi.org/...}{...}`. The preamble maps `\href` to `\url`, because the
+  class does not load hyperref.
+- The "Overfull \hbox/\vbox ... while \output is active" warnings come from the template's
+  header and footer; the blank template produces the same ones. After editing any table,
+  grep the log for `Overfull \hbox ... in paragraph/alignment`.
 
-The change log of the October 2026 revision and the issues awaiting supervisor review
-are in [`paper_taes/REVISION_NOTES.md`](paper_taes/REVISION_NOTES.md).
+The change log of the earlier TAES revision is in
+[`paper_taes/REVISION_NOTES.md`](paper_taes/REVISION_NOTES.md).
 
 ---
 
@@ -535,11 +553,10 @@ Honest caveats:
   capacity in the reward.
 - All timings come from a laptop-class CPU.
 
-Open items awaiting a decision are listed in
-[`paper_taes/REVISION_NOTES.md`](paper_taes/REVISION_NOTES.md). The main ones:
+Open items awaiting a decision:
 - whether to run a greedy-only D3QN evaluation (a new experiment);
-- the TAES overlength charges beyond 6 printed pages;
-- the mandatory AI-use disclosure.
+- IEEE membership grades for the author line;
+- whether to keep the Hu & Han (2025) reference, which is still an arXiv preprint.
 
 ---
 
@@ -551,11 +568,12 @@ Open items awaiting a decision are listed in
 - **Paper figures must be authored at printed size.** Authoring at a large figsize
   shrinks the fonts several-fold on inclusion. Check that no ink touches a PNG edge.
 - **Do not re-run the notebook in place just to restyle a figure.** Use
-  `paper_taes/figures/replot_paper_figures.py`.
+  `paper_taes/figures/replot_paper_figures.py`, then copy the output into
+  `paper_ojvt/figures/`.
 - **Elevation r = 20 m** and the **diagonal real-trace drift** come from the MATLAB
   configuration (`GenHemSphCoord`; `StraightDiagonalFlag = 1`), not from the paper.
 - **Timing numbers are not deterministic.** Re-sync the `\PL*` macros and the hard-coded
-  Section V timings after any re-run.
+  Section VII timings in `paper_ojvt/ojvt.tex` after any re-run.
 - **PCHIP smoothing is display-only**; the markers show the true computed points.
 - The Section R markdown heading still reads "(20 models)"; the current count is **18**.
 
@@ -564,7 +582,7 @@ Open items awaiting a decision are listed in
 ## References
 
 Neither reference PDF is redistributed in this repository. The full verified bibliography
-is in [`paper_taes/references.bib`](paper_taes/references.bib).
+is in [`paper_ojvt/References.bib`](paper_ojvt/References.bib).
 
 1. A. Saeed, M. Erdem, A. Saleem, O. Gurbuz, and M. A. Akkas, "Joint resource allocation
    for terahertz band drone communications," *IEEE Trans. Veh. Technol.*, vol. 73, no. 6,
@@ -587,10 +605,9 @@ is in [`paper_taes/references.bib`](paper_taes/references.bib).
 - **Mikail Erdem**, Postdoctoral Researcher and Instructor, Sabancı University
 
 *Machine Learning Based Spectrum Allocation for THz UAV Communications*, manuscript in
-preparation for IEEE Transactions on Aerospace and Electronic Systems (Correspondence).
-Source: [`paper_taes/thz_ml_spectrum_allocation.tex`](paper_taes/thz_ml_spectrum_allocation.tex);
-compiled PDF:
-[`paper_taes/thz_ml_spectrum_allocation.pdf`](paper_taes/thz_ml_spectrum_allocation.pdf).
+preparation for the IEEE Open Journal of Vehicular Technology.
+Source: [`paper_ojvt/ojvt.tex`](paper_ojvt/ojvt.tex);
+compiled PDF: [`paper_ojvt/ojvt.pdf`](paper_ojvt/ojvt.pdf).
 
 This work was supported by the Scientific and Technological Research Council of Türkiye
 (TÜBİTAK) under Grant No. 224N014.
