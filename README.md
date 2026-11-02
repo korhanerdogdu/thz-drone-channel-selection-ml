@@ -97,7 +97,6 @@ paper_taes/                      # previous version — IEEE TAES Correspondence
   thz_ml_spectrum_allocation.pdf #   compiled manuscript
   references.bib                 #   bibliography of the TAES version
   IEEEtaes.cls, IEEEtaes.bst     #   official TAES template files (unmodified)
-  REVISION_NOTES.md              #   change log and open issues of the Oct 2026 revision
   figures/                       #   source of the paper figures (re-plot script + data)
     maxactive_reference_single.png   # Fig. 1 (notebook output, unchanged)
     fig_capacity_main.pdf/.png       # Fig. 2
@@ -495,15 +494,13 @@ pdflatex ojvt
 ```
 
 The manuscript uses the official **IEEE OJVT** template (`\documentclass{ieee-ojvt}`;
-the class file and logo are unmodified). The paper has eight sections:
-1. Introduction
-2. Related Work
-3. Research Gap and Contributions
-4. System Model and Background
-5. Alternative Machine Learning Solutions
-6. Performance Analysis
-7. Convergence and Complexity
-8. Conclusion
+the class file and logo are unmodified). The paper has six sections:
+1. Introduction (A. Related Work; B. Research Gap and Contributions)
+2. System Model and Background
+3. Alternative Machine Learning Solutions
+4. Performance Analysis
+5. Convergence and Complexity
+6. Conclusion
 
 It has 3 figures and 6 tables, followed by the acknowledgment, which includes the AI-use
 statement.
@@ -519,7 +516,7 @@ document ends with `\bibliographystyle{IEEEtran}` and `\bibliography{References}
 Every number in the results and complexity tables traces to a notebook cell. The only
 non-deterministic values are the Section U timings, held in **preamble macros**
 (`\PLNCH`, `\PLMASEL`, `\PLMASTEP`, `\PLMASTEPBW`, `\PLPREDUS`). Those macros already
-contain `$...$`: write `\PLMASEL{}`, **never** `$\PLMASEL$`. Some timings in Section VII
+contain `$...$`: write `\PLMASEL{}`, **never** `$\PLMASEL$`. Some timings in Section V
 are hard-coded, so re-sync them too after any re-run.
 
 LaTeX notes:
@@ -529,9 +526,6 @@ LaTeX notes:
 - The "Overfull \hbox/\vbox ... while \output is active" warnings come from the template's
   header and footer; the blank template produces the same ones. After editing any table,
   grep the log for `Overfull \hbox ... in paragraph/alignment`.
-
-The change log of the earlier TAES revision is in
-[`paper_taes/REVISION_NOTES.md`](paper_taes/REVISION_NOTES.md).
 
 ---
 
@@ -573,7 +567,7 @@ Open items awaiting a decision:
 - **Elevation r = 20 m** and the **diagonal real-trace drift** come from the MATLAB
   configuration (`GenHemSphCoord`; `StraightDiagonalFlag = 1`), not from the paper.
 - **Timing numbers are not deterministic.** Re-sync the `\PL*` macros and the hard-coded
-  Section VII timings in `paper_ojvt/ojvt.tex` after any re-run.
+  Section V timings in `paper_ojvt/ojvt.tex` after any re-run.
 - **PCHIP smoothing is display-only**; the markers show the true computed points.
 - The Section R markdown heading still reads "(20 models)"; the current count is **18**.
 

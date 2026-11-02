@@ -85,21 +85,21 @@ between unmanned aerial vehicles (UAVs) such as drone swarms and aerial backhaul
 \cite{akyildiz2022thz,chaccour2022seven,azari2022thzuav}. At the altitudes where drones
 operate, the water-vapor concentration is lower than at sea level, so THz links are more
 practical in the air than on the ground \cite{saeed2020altitudes,saeed2021cfb}. THz
-propagation, however, differs from microwave and millimeter-wave propagation in three
-ways that matter for system design. First, the free-space spreading loss grows with the
-square of both distance and frequency \cite{jornet2011channel}. Second, water-vapor
-molecules absorb energy at many discrete resonance lines, so the attenuation changes by
-orders of magnitude across the band, and the usable spectrum consists of transmission
-windows that narrow as the distance grows \cite{jornet2011channel,han2016multiwideband}.
-Third, the absorbed energy is re-radiated as molecular absorption noise, so the noise
-level also depends on frequency and distance \cite{jornet2011channel}. Highly
+propagation, however, differs from microwave and millimeter-wave propagation in ways that
+matter for system design. The free-space spreading loss grows with the square of both
+distance and frequency \cite{jornet2011channel}, and water-vapor molecules absorb energy
+at many discrete resonance lines, so the attenuation changes by orders of magnitude
+across the band. The usable spectrum consequently consists of transmission windows that
+narrow as the distance grows \cite{jornet2011channel,han2016multiwideband}. The absorbed
+energy is re-radiated as molecular absorption noise, which makes the noise level depend on
+frequency and distance as well \cite{jornet2011channel}. Highly
 directional antennas close the link budget, but narrow beams are easily misaligned when
 the aircraft move \cite{moorthy2022beam}. The capacity of a UAV-to-UAV THz link
 consequently depends jointly on distance, absorption, noise, antenna gain, beamwidth,
 and beam alignment, and the capacity can collapse by many orders of magnitude when the
 beams drift apart \cite{10399804}.
 
-Spectrum allocation is therefore a central design problem for such links. The band is
+Spectrum allocation is thus a central design problem for such links. The band is
 divided into many narrow frequency channels, and for every link geometry the transmitter
 must decide which channels to activate and how to divide its fixed transmit power among
 them. Each additional active channel adds bandwidth but takes power away from the other
@@ -108,11 +108,8 @@ whereas concentrating the power on too few channels wastes bandwidth. The best
 allocation changes whenever the distance or the beam alignment changes, so a mobile UAV
 link has to recompute the allocation continuously.
 
-
-% ============================================================================
-\section{RELATED WORK}
+\subsection{RELATED WORK}
 \label{sec:related}
-% ============================================================================
 Most prior work addresses THz spectrum allocation with optimization-based methods, and a
 smaller but growing body of work replaces these methods with learned models.
 
@@ -129,7 +126,7 @@ analyzed the capacity of THz links for drones, aircraft, and satellites. Xu \emp
 \cite{xu2021thzuav} jointly optimized the UAV location, bandwidth, and power for
 UAV-to-ground links. Beam-oriented works such as LeTera \cite{moorthy2020letera} and
 LeBeam \cite{moorthy2022beam} adapt the beamwidth to in-flight mobility but assume a
-single THz channel and therefore do not address channel selection. Saeed \emph{et al.}
+single THz channel and do not address channel selection. Saeed \emph{et al.}
 \cite{10399804} combined these directions for drone-to-drone links by jointly
 considering channel selection, water-filling (WF) or equal-power (EP) allocation, and
 beamwidth adjustment, and proposed the MaxActive channel-selection scheme. MaxActive with
@@ -160,11 +157,8 @@ channel selection as a contextual bandit solved by a dueling double deep $Q$-net
 but the policy requires a separately trained model for every distance--gain pair and was
 tested on a narrower band ($0.5$--$1$~THz) with a single learning method.
 
-
-% ============================================================================
-\section{RESEARCH GAP AND CONTRIBUTIONS}
+\subsection{RESEARCH GAP AND CONTRIBUTIONS}
 \label{sec:contrib}
-% ============================================================================
 Two questions remain open. The first is whether a deep reinforcement learning policy is
 necessary, or whether simpler supervised models trained on the same physical channel state
 can predict the outcome of the spectrum-allocation search. The second is what such
@@ -357,14 +351,14 @@ EP closely approaches the WF capacity and is the most practical of the schemes c
 there.
 
 The search thus returns the best member of the family of SNR-ordered nested subsets for
-the given channel state and power allocation, and the optimality of MaxActive is limited
-in two ways. First, the optimality holds only within the adopted threshold-search family.
-Subsets that are not SNR-ordered prefixes are never examined, so global optimality over
-all $2^{|\mathcal{F}|}$ subsets is not claimed in general. Under EP with (near-)equal
+the given channel state and power allocation. The optimality holds only within the
+adopted threshold-search family: subsets that are not SNR-ordered prefixes are never
+examined, so global optimality over all $2^{|\mathcal{F}|}$ subsets is not claimed in
+general. Under EP with (near-)equal
 channel widths, every selected channel receives the same power, and the
 capacity-maximizing subset of any given size consists of the highest-SNR channels. In
 that case, restricting the search to SNR-ordered prefixes loses nothing, provided that
-the search examines every prefix length. Second, selection and power allocation are
+the search examines every prefix length. In addition, selection and power allocation are
 optimized alternately rather than jointly, so MaxActive is optimal conditioned on the
 power allocation supplied to the search, not for the joint selection-and-power problem
 \eqref{eq:problem}. In this restricted sense, and within the LBLRTM channel model and the
@@ -425,23 +419,23 @@ the value of the spectrum-allocation decision by mapping a compact feature vecto
 $\mathbf{x}$ of the channel state to an estimate $\hat C$ of the capacity that MaxActive
 would achieve, in the spirit of \cite{sun2018learning}. A selection policy learns the
 decision itself by mapping the channel state to a set of active channels, whose capacity
-is then evaluated with the physical model \eqref{eq:snr}--\eqref{eq:capacity}. The
-distinction matters in practice. A regressor returns a number rather than a channel set,
-so the regressor can predict a capacity that no feasible allocation reaches. A policy
-returns an allocation that can be transmitted, and the capacity reported for the policy
-is the capacity that the allocation actually delivers.
+is then evaluated with the physical model \eqref{eq:snr}--\eqref{eq:capacity}. Because a
+regressor returns a number rather than a channel set, the regressor can predict a
+capacity that no feasible allocation reaches, whereas a policy returns an allocation that
+can be transmitted, and the capacity reported for the policy is the capacity that the
+allocation actually delivers.
 
 Because MaxActive returns the best capacity within its search family, MaxActive
 upper-bounds any model trained to imitate the search. When regressor outputs are plotted
-against the reference, we therefore display
+against the reference, we display
 \begin{equation}
 \hat{C}_{\text{clip}}=\min\!\big(\hat{C},\,C_{\text{MaxActive}}\big).
 \label{eq:clip}
 \end{equation}
 The clip \eqref{eq:clip} requires $C_{\text{MaxActive}}$, which is exactly the quantity a
 deployed regressor does not have; if the reference were available online, no learned
-model would be needed. The clip is therefore used only for offline visualization and is
-not part of the online prediction path. At deployment, the regressor emits $\hat C$ and
+model would be needed. The clip is used only for offline visualization and is not part
+of the online prediction path. At deployment, the regressor emits $\hat C$ and
 the policy emits a channel set, with no access to the reference. Every reported error is
 computed from raw, unclipped predictions, and the ceiling violations that the clip would
 hide are reported explicitly.
@@ -538,7 +532,7 @@ state stacks the log path loss and the log noise power of the $N$ best-ranked ch
 \end{align}
 where the subscript $(m)$ denotes the $m$th-ranked channel. An action $a\in\mathcal{A}$
 selects a number of channels $N_{\text{sel}}(a)$, and the $N_{\text{sel}}$ highest-ranked
-channels are activated with EP \eqref{eq:ep}. The action space therefore contains only
+channels are activated with EP \eqref{eq:ep}. The action space thus contains only
 SNR-ordered prefixes, the same family that MaxActive searches, and the resulting
 allocation is evaluated with the physical model \eqref{eq:snr}--\eqref{eq:capacity}, which
 gives the true capacity $C$ of the decision. Following \cite{elcik2025d3qn}, the reward is
@@ -577,8 +571,8 @@ action, receives one reward, and the episode ends. The current selection does no
 the channel state at the next geometry, which is set by the trajectory and the physics.
 With no state transition to influence, the horizon is one and the discount $\beta$ in
 \eqref{eq:double} is zero, so the double-DQN target reduces to the immediate reward,
-$y=r$, and $Q(\mathbf{s},a)$ estimates the reward of action $a$. The problem is therefore
-a contextual $|\mathcal{A}|$-armed bandit \cite{langford2007epoch} rather than sequential
+$y=r$, and $Q(\mathbf{s},a)$ estimates the reward of action $a$. The problem is a
+contextual $|\mathcal{A}|$-armed bandit \cite{langford2007epoch} rather than sequential
 reinforcement learning, and the mechanisms that make deep reinforcement learning fragile,
 namely bootstrapping bias, moving targets, and delayed rewards, are absent. Because the
 target is the immediate reward, the separate target network of \eqref{eq:double} is
@@ -587,23 +581,22 @@ to \cite{elcik2025d3qn,wang2016dueling} but claim no sequential decision-making.
 
 The policy outputs a channel set that can be transmitted. The capacity of the set is that
 of a feasible SNR-ordered prefix with equal power, so the capacity cannot exceed that of
-the best such prefix, which is the set MaxActive-EP searches for. Agreement with MaxActive
-should therefore be read with three qualifications. First, the policy can at best match
-the reference and cannot improve on the reference. Second, policy training uses the
-reference capacity $C_{\max}$ in the reward. Third, by \eqref{eq:aout}, the reported
+the best such prefix, which is the set MaxActive-EP searches for. The policy can
+therefore at best match the reference and cannot improve on the reference. Agreement
+with MaxActive must also be read in light of the training procedure: policy training uses
+the reference capacity $C_{\max}$ in the reward, and by \eqref{eq:aout} the reported
 decision is the best of the greedy action and the actions evaluated during training, so
 the agreement reflects the learned network together with the exploration performed while
 training the network. The implementation does not record which of the two sources
 produced the returned action.
 
 As in \cite{elcik2025d3qn}, the policy is trained per operating context, with one
-lightweight network for each pair of distance and gain, and the per-context training is a
-real restriction. A previously unseen geometry is not covered by an already-trained
-network, and obtaining a policy for the new geometry requires a separate training run,
+lightweight network for each pair of distance and gain. A previously unseen geometry is
+therefore not covered by an already-trained network, and obtaining a policy for the new geometry requires a separate training run,
 which itself needs the reference capacity of that geometry. The training run is short in
 absolute terms, but the run is an offline cost that exceeds the cost of a single
-MaxActive search. The present D3QN branch therefore suits a trajectory envelope that can
-be enumerated and trained for in advance and pays off only when a trained context recurs;
+MaxActive search. The present D3QN branch suits a trajectory envelope that can be
+enumerated and trained for in advance and pays off only when a trained context recurs;
 the branch does not suit an arbitrary geometry met in flight. The supervised branch does
 not share the restriction, because one fitted regressor maps the features of any geometry
 inside the trained envelope to a capacity estimate. Two routes would lift the
@@ -846,18 +839,20 @@ the ceiling), and PCHIP-smoothed with markers at the computed points.}
 Table~\ref{tab:cv} gives the nested cross-validated metrics for the EP target, ranked by
 RMSE. The WF target was cross-validated in the same way, and the two targets agree to
 within $0.055$ RMSE for every one of the eighteen models and to within $0.021$ for all but
-the single decision tree, as the near-equality of the WF and EP capacities in
-Table~\ref{tab:maxactive} implies; only the EP column is therefore tabulated. The table
-leads to three findings. First, the smooth nonparametric and kernel models perform best.
-The Gaussian process leads by a wide margin ($R^2=0.99$, median relative error
+the single decision tree, as the near-equality of the WF and EP capacities implies; only
+the EP column is tabulated.
+
+The smooth nonparametric and kernel models perform best. The Gaussian process leads by a
+wide margin ($R^2=0.99$, median relative error
 $\approx1.9\%$), followed by ExtraTrees, SVR-RBF, MLP, and $k$-NN. The leading models assume
 the smoothness that the physical capacity surface exhibits, so they interpolate MaxActive
-closely and generalize across folds. Second, the regularized linear models are stable but
-biased. Ridge, Lasso, ElasticNet, and BayesianRidge hold $R^2\approx0.97$ with small
+closely and generalize across folds. The regularized linear models, in contrast, are
+stable but biased: Ridge, Lasso, ElasticNet, and BayesianRidge hold $R^2\approx0.97$ with small
 variance, yet their $\approx45\%$ median relative error reveals a systematic offset,
 because a model that is affine in the features cannot capture the curvature of a capacity
-that decays over nine decades. Third, cross-validation exposes failures that a single
-split hides. On a single $75/25$ split, Huber regression is second only to the Gaussian
+that decays over nine decades.
+
+Cross-validation also exposes failures that a single split hides. On a single $75/25$ split, Huber regression is second only to the Gaussian
 process (RMSE $0.183$), but under CV the Huber model falls to $R^2=0.93\pm0.10$. Ordinary
 least squares looks acceptable on the same split ($R^2=0.991$) but is far worse under CV
 ($R^2=-7.98\pm31$), dominated by unlucky folds. Huber regression and ordinary least
@@ -905,8 +900,8 @@ Bag.\ $=$ Bagging. D3QN row: capacity of the selected channel set relative to
 MaxActive-EP (not a regression metric).\par}
 \end{table}
 
-The last two columns of Table~\ref{tab:cv} quantify how far the raw predictions exceed
-the reference ceiling. The excess is what the display clip \eqref{eq:clip} conceals and
+The two ceiling-violation columns quantify how far the raw predictions exceed the
+reference ceiling. The excess is what the display clip \eqref{eq:clip} conceals and
 is the error a deployed regressor would actually commit, since a deployed regressor has
 no ceiling to clip against. Every regressor exceeds the reference at one or more points,
 so the size of the violation is a first-class selection criterion. The piecewise-constant
@@ -946,13 +941,13 @@ ExtraTrees   & $2.7\%$ & $12.2\%$ & $24.6\%$\\
 \end{tabular*}
 \end{table}
 
-On the elevation and real-trace scenarios of Fig.~\ref{fig:mlmob}, fitting on all $60$
+On the elevation and real-trace scenarios, fitting on all $60$
 samples, the strongest models reproduce the curves closely: XGBoost, GradBoost, and
 GaussProc reach median relative errors of $0.07\%$, $0.7\%$, and $2.8\%$ over the
 elevation and real scenarios, with Huber regression next at $4.4\%$. The mobility errors
 come from an in-sample fit, which flatters models such as GradBoost that fail under
-cross-validation; Table~\ref{tab:cv}, and not the in-sample fit, is therefore the basis
-for the ranking.
+cross-validation, so the ranking rests on the nested cross-validation rather than on the
+in-sample fit.
 
 \begin{figure*}[!t]
 \centerline{\includegraphics[width=4.9in]{fig_capacity_mobility.pdf}}
@@ -978,14 +973,13 @@ those of MaxActive; in the main study the counts differ by up to $30$ channels (
 $497$ versus $467$ at $81$~m in the aligned case). Near its maximum, the capacity is flat
 in the number of active channels, so neighboring prefixes deliver almost the same
 capacity. A policy operating at the same individual-channel granularity as MaxActive-EP
-therefore returns a transmittable channel set of nearly reference capacity, under
-elevation and real-trace mobility as well. The result is subject to the three
-qualifications stated with the policy. The ratio is bounded by construction, because the
-policy chooses among the same SNR-ordered prefixes; training uses the reference capacity
-in the reward; and the reported decision is the better of the greedy action and the best
-of the $1600$ actions evaluated during training \eqref{eq:aout}. The reported ratios
-therefore characterize the complete training-plus-selection procedure, and how often the
-greedy network output alone attains the ratios was not recorded.
+thus returns a transmittable channel set of nearly reference capacity, under elevation
+and real-trace mobility as well. The ratio is bounded by construction, because the policy
+chooses among the same SNR-ordered prefixes. Training uses the reference capacity in the
+reward, and the reported decision is the better of the greedy action and the best of the
+$1600$ actions evaluated during training \eqref{eq:aout}, so the reported ratios
+characterize the complete training-plus-selection procedure. How often the greedy network
+output alone attains the ratios was not recorded.
 
 The contrast between the regressors and the policy is the most transferable finding of
 the study. A regressor predicts a number and can exceed the physical bound. The policy
@@ -1024,8 +1018,8 @@ accuracy, and adds the MaxActive and D3QN references for context.
 \label{sec:runtime}
 Asymptotic orders alone do not establish a practical benefit, so every stage was measured
 on identical channel states, on a single core of an Intel Core i7-13620H, with the band
-discretized into $|\mathcal{F}|=\PLNCH$ active channels per context. The measured columns
-of Table~\ref{tab:complexity} average the eleven aligned contexts.
+discretized into $|\mathcal{F}|=\PLNCH$ active channels per context. The measured values
+are averages over the eleven aligned contexts.
 
 The reference costs \PLMASEL{} for the threshold sweep alone and \PLMASTEP{} for a
 complete link update with power allocation iterated to convergence. On the three
@@ -1037,18 +1031,17 @@ which amounts to \PLPREDUS{} end-to-end and an $88\times$ reduction in the per-u
 decision cost. The model evaluation alone is $1800$--$3700\times$ faster than the search,
 but feature extraction dominates the online path, so the end-to-end gain saturates near
 two orders of magnitude, and feature extraction rather than inference is the target for
-further optimization. The tree ensembles are the exception at the other end. Tree
-ensembles need $3.0$--$12$~ms per prediction because hundreds of estimators must each be
-traversed, which cuts their advantage to $6$--$20\times$ and makes the ensembles a poor
+further optimization. The tree ensembles are an exception: they need $3.0$--$12$~ms per prediction, since
+hundreds of estimators must each be traversed, which cuts their advantage to $6$--$20\times$ and makes the ensembles a poor
 per-update choice at the present dataset size despite their accuracy. The D3QN gives the
-fastest decision of all. The D3QN state is built from the SNR ranking that MaxActive
+fastest decision among the evaluated methods. The D3QN state is built from the SNR ranking that MaxActive
 computes anyway ($0.55$~ms, shared by both methods), after which a forward pass and
 $\arg\max$ take $0.05$~ms, three orders of magnitude below the search, and the policy
 returns the channel set itself rather than a capacity estimate. The D3QN cost is paid
 offline: $0.11$~s per context, or about $4$~s for the $33$ contexts of the main study.
 Training one context thus costs more than one threshold sweep (\PLMASEL{}) and also needs
-the reference capacity of the context. The per-context policy therefore saves computation
-only when a trained context is revisited, and the online figure above applies to such
+the reference capacity of the context, so the per-context policy saves computation only
+when a trained context is revisited, and the online figure above applies to such
 contexts.
 
 \begin{table*}[!t]
@@ -1133,8 +1126,8 @@ error). The accuracy ranking of Table~\ref{tab:cv} therefore roughly tracks the
 asymptotic cost ranking of Table~\ref{tab:complexity}: the last few percent of accuracy
 are bought at a super-linear price in the number of samples.
 
-Two regimes invert the recommendation, however. At the present scale ($n\le60$), the
-asymptotic penalty is invisible in wall-clock terms. The Gaussian process trains in
+The dataset size determines whether this trade-off matters in practice. At the present
+scale ($n\le60$), the asymptotic penalty is invisible in wall-clock terms. The Gaussian process trains in
 $14$~ms and predicts in $43$~$\mu$s, which is cheaper at inference than $k$-NN or any
 ensemble, so the most accurate model can be chosen without a practical penalty, and the
 Gaussian process is the model we recommend at the present scale. The time cost at the
@@ -1143,8 +1136,8 @@ which is why the tree ensembles are the slowest predictors in the table. As $n$ 
 toward the $10^4$--$10^6$ samples that denser simulation grids would provide, the cubic
 training cost and quadratic memory of the kernel methods become prohibitive, while the
 ensembles amortize their per-tree overhead, and the balance shifts to XGBoost and
-ExtraTrees. A reasonable guideline is therefore to prefer kernel methods while the
-dataset is small and tree ensembles once the dataset is large.
+ExtraTrees. Kernel methods are thus preferable while the dataset is small, and tree
+ensembles once the dataset is large.
 
 
 % ============================================================================
@@ -1159,16 +1152,16 @@ the same physical channel state: supervised regressors that predict the capacity
 search achieves, and a D3QN contextual-bandit policy that learns the channel selection
 itself.
 
-Three findings carry beyond the present system. First, the inductive bias that matters is
-smoothness. The capacity surface is smooth and wide-ranging, so kernel and
-Gaussian-process models track the reference closely, whereas piecewise-constant learners
-cannot extrapolate the surface and overshoot the physical bound by orders of magnitude.
-Second, on datasets of the present size, the evaluation protocol decides the ranking. A
-single split reorders the models and hides overfitting, so nested cross-validation is a
-requirement rather than a refinement. Third, learning the decision is safer than learning
-its value. A policy that selects channels reports only capacities that a transmittable
-allocation actually delivers, whereas a value regressor can predict a rate the link
-cannot support.
+The results show that smoothness is the inductive bias that matters for the present
+problem. The capacity surface is smooth and wide-ranging, so kernel and Gaussian-process
+models track the reference closely, whereas piecewise-constant learners cannot
+extrapolate the surface and overshoot the physical bound by orders of magnitude. On
+datasets of the present size, the evaluation protocol also decides the ranking: a single
+split reorders the models and hides overfitting, which makes nested cross-validation a
+requirement rather than a refinement. Learning the decision proved safer than learning
+its value, because a policy that selects channels reports only capacities that a
+transmittable allocation actually delivers, whereas a value regressor can predict a rate
+the link cannot support.
 
 In terms of cost, once trained, both learned branches lower the online decision cost by
 about two orders of magnitude or more relative to the search, and both fit in the memory
@@ -1176,12 +1169,12 @@ of a small flight computer. For the regressors, feature extraction rather than i
 now limits the speed-up. At the present scale, the Gaussian process is the preferred
 capacity predictor, and the D3QN is preferred where the channel set is needed. Only as
 the dataset grows by orders of magnitude does the super-linear cost of kernel methods
-favor tree ensembles. Three caveats bound the conclusions. First, the D3QN branch is
-trained per operating context with the reference capacity in its reward, and the reported
-decision also draws on the actions explored in training; the branch therefore covers a
-pre-enumerated trajectory envelope rather than an arbitrary unseen geometry and pays off
-only when trained contexts recur. Second, the regressors are validated as interpolators
-within the trained envelope. Third, all timings come from a laptop-class CPU. Future work
+favor tree ensembles. The D3QN branch is trained per operating context with the reference
+capacity in its reward, and the reported decision also draws on the actions explored in
+training, so the branch covers a pre-enumerated trajectory envelope rather than an
+arbitrary unseen geometry and pays off only when trained contexts recur. The regressors
+are validated as interpolators within the trained envelope, and all timings come from a
+laptop-class CPU. Future work
 will replace the per-context bandits with a single geometry-generalizing policy, evaluate
 the greedy policy without the training-time fallback, predict the channel set rather than
 only the capacity, validate on embedded hardware, and extend the dataset into the regime
